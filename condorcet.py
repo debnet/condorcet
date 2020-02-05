@@ -3,6 +3,7 @@ import argparse
 import base64
 import discord
 import hashlib
+import hmac
 import logging
 import os
 import re
@@ -106,7 +107,6 @@ class Poll(pw.Model):
     Poll
     """
     name = pw.CharField()
-    salt = pw.CharField()
     winners = pw.SmallIntegerField(default=1)
     proposals = pw.BooleanField(default=False)
     open_apply = pw.BooleanField(default=True)
@@ -167,36 +167,15 @@ def get_icon(indice):
     return ICONS.get(indice, f':regional_indicator_{indice.lower()}:')
 
 
-def get_salt():
-    """
-    Get a random salt for Fernet algorithm
-    :return: Base64-encoded salt
-    """
-    return base64.urlsafe_b64encode(os.urandom(16)).decode()
-
-
-def encrypt(message, salt, password):
+def encrypt(message, password):
     """
     Encrypt message with Fernet algorithm
     :param message: Message to encrypt
-    :param salt: Salt
     :param password: Password
     :return: Base64 encrypted string
     """
-    from cryptography.fernet import Fernet
-    from cryptography.hazmat.backends import default_backend
-    from cryptography.hazmat.primitives import hashes
-    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=base64.urlsafe_b64decode(salt.encode()),
-        iterations=100000,
-        backend=default_backend())
-    key = base64.urlsafe_b64encode(kdf.derive(password.encode()))
-    fernet = Fernet(key)
-    token = fernet.encrypt(str(message).encode())
-    return base64.urlsafe_b64encode(token).decode()
+    encrypted = hmac.new(msg=str(message).encode(), key=str(password).encode())
+    return base64.urlsafe_b64encode(encrypted.digest())
 
 
 def hash(message):
@@ -341,7 +320,7 @@ async def on_message(message):
         return
 
     # At this point, all following commands are for administrators only
-    if not user.admin:
+    if keyword in ('!new', '!open', '!close') and not user.admin:
         await author.send(":no_entry:  Vous n'avez pas accès à cette fonctionnalité.")
         return
 
@@ -509,7 +488,7 @@ async def _leave(author, user, channel, args):
             return
         candidate = Candidate.get_or_none(user=user, poll=poll, id=args.proposal)
         if candidate:
-            candidate.delete()
+            candidate.delete_instance()
             await author.send(
                 f":white_check_mark:  Vous avez retiré avec succès votre proposition "
                 f"**{candidate.proposal}** à l'élection de **{poll}** (`{poll.id}`) !")
@@ -522,7 +501,7 @@ async def _leave(author, user, channel, args):
     else:
         candidate = Candidate.get_or_none(user=user, poll=poll)
         if candidate:
-            candidate.delete()
+            candidate.delete_instance()
             await author.send(
                 f":white_check_mark:  Vous vous êtes retiré avec succès en tant "
                 f"que candidat à l'élection de **{poll}** !")
@@ -546,9 +525,10 @@ async def _vote(author, user, channel, args):
     parser = Parser(
         prog='!vote',
         description="Permet de voter à un scruting donné.")
-    parser.add_argument('candidates', metavar='candidat', type=str, nargs='+',
-                        help="Candidats (par ordre de préférence du plus ou moins apprécié)")
-    parser.add_argument('--password', '-P', type=str, required=True, help="Mot de passe (pour l'anonymat)")
+    parser.add_argument('password', type=str, help="Mot de passe (pour l'anonymat)")
+    parser.add_argument(
+        'candidates', metavar='candidat', type=str, nargs='+',
+        help="Candidats (par ordre de préférence du plus ou moins apprécié)")
     parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
     args = parser.parse_args(args)
     if parser.message:
@@ -579,7 +559,7 @@ async def _vote(author, user, channel, args):
             f"utilisez la commande `!pass` pour le définir !")
         return
     # Encrypt user with password and save vote choices
-    encrypted, choices = encrypt(user.id, poll.salt, args.password), ' '.join(candidates)
+    encrypted, choices = encrypt(user.id, args.password), ' '.join(candidates)
     vote, created = Vote.get_or_create(user=encrypted, poll=poll, defaults=dict(choices=choices))
     if not created:
         vote.choices = choices
@@ -648,7 +628,7 @@ async def _new(author, user, channel, args):
         await author.send(f"```{parser.message}```")
         return
     # Create new poll
-    poll = Poll.create(name=args.name, salt=get_salt(), winners=args.winners or 1, proposals=args.proposals)
+    poll = Poll.create(name=args.name, winners=args.winners or 1, proposals=args.proposals)
     # Message to user/channel
     message = f":ballot_box:  Le scrutin **{poll}** (`{poll.id}`) a été créé et ouvert aux candidatures, " \
               f"vous pouvez utiliser la commande `!apply` pour vous présenter (ou `!leave` pour vous retirer) !"
@@ -760,7 +740,6 @@ def test_condorcet_multiple():
     # Create poll
     poll = Poll.create(
         name="Test Condorcet Multiple",
-        salt=get_salt(),
         winners=3,
         proposals=False,
         open_apply=False,
