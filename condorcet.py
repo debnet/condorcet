@@ -353,7 +353,7 @@ async def _pass(author, user, channel, args):
     parser = Parser(
         prog='!pass',
         description="Définit un mot de passe pour pouvoir voter anonymement aux scrutins.")
-    parser.add_argument('password', type=str, help="Mot de passe")
+    parser.add_argument('password', type=str, help="Mot de passe (pour l'anonymat)")
     args = parser.parse_args(args)
     if parser.message:
         await author.send(f"```{parser.message}```")
@@ -415,7 +415,7 @@ async def _leave(author, user, channel, args):
     # Argument parser
     parser = Parser(
         prog='!leave',
-        description="Permet de retirer sans candidature au scrutin.")
+        description="Permet de retirer sa candidature au scrutin.")
     parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
     args = parser.parse_args(args)
     if parser.message:
@@ -430,7 +430,7 @@ async def _leave(author, user, channel, args):
     candidate = Candidate.get_or_none(user=user, poll=poll)
     if candidate:
         await author.send(
-            f":white_check_mark:  Vous vous êtes retirés avec succès en tant "
+            f":white_check_mark:  Vous vous êtes retiré avec succès en tant "
             f"que candidat à l'élection de **{poll}** !")
         if hasattr(channel, 'topic'):
             await channel.send(f":door:  <@{user.id}> se retire en tant que candidat l'élection de **{poll.name}** !")
@@ -454,7 +454,7 @@ async def _vote(author, user, channel, args):
         description="Permet de voter à un scruting donné.")
     parser.add_argument('candidates', metavar='candidat', type=str, nargs='+',
                         help="Candidats (par ordre de préférence du plus ou moins apprécié)")
-    parser.add_argument('--password', '-P', type=str, required=True, help="Mot de passe")
+    parser.add_argument('--password', '-P', type=str, required=True, help="Mot de passe (pour l'anonymat)")
     parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
     args = parser.parse_args(args)
     if parser.message:
@@ -474,8 +474,12 @@ async def _vote(author, user, channel, args):
     if possibles != set(candidates) or len(possibles) != len(candidates):
         await author.send(f":no_entry:  Vous n'avez pas sélectionné et/ou classé l'ensemble des candidats !")
         return
-    # Verify user password
-    if hash(args.password) != user.password:
+    # Create new password for user
+    if not user.password:
+        user.password = hash(args.password)
+        user.save(only=('password', ))
+    # ... or verify user password
+    elif hash(args.password) != user.password:
         await author.send(
             f":no_entry:  Votre mot de passe de scrutin est incorrect ou n'a pas encore configuré, "
             f"utilisez la commande `!pass` pour le définir !")
