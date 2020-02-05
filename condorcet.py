@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import peewee as pw
+import shlex
 from datetime import datetime
 from discord import utils
 from string import ascii_uppercase, digits
@@ -106,6 +107,8 @@ class Poll(pw.Model):
     """
     name = pw.CharField()
     salt = pw.CharField()
+    winners = pw.SmallIntegerField(default=1)
+    proposals = pw.BooleanField(default=False)
     open_apply = pw.BooleanField(default=True)
     open_vote = pw.BooleanField(default=False)
 
@@ -125,14 +128,14 @@ class Candidate(pw.Model):
     """
     poll = pw.ForeignKeyField(Poll)
     user = pw.ForeignKeyField(User)
+    proposal = pw.CharField(null=True)
     indice = pw.CharField(null=True)
     date = pw.DateTimeField(default=datetime.now)
 
     class Meta:
         database = database
         indexes = (
-            (('poll', 'user'), True),
-            (('poll', 'indice'), True),
+            (('poll', 'user', 'proposal'), True),
         )
 
 
@@ -257,7 +260,10 @@ async def on_message(message):
     # Get or create user from message
     user = await get_user(author)
     # Extract keyword function
-    keyword, *args = content.split()
+    try:
+        keyword, *args = shlex.split(content)
+    except ValueError:
+        keyword, *args = content.split()
     args = author, user, channel, args
     # Ignore messages not starting with keyword symbol
     if not keyword.startswith('!'):
@@ -298,12 +304,17 @@ async def on_message(message):
         await author.send(":no_entry:  Vous n'avez pas accès à cette fonctionnalité.")
         return
 
-    # Command: new poll
+    # Command: new poll and open to candidates
     if keyword == '!new':
         await _new(*args)
         return
+    # Command: open poll to vote
     if keyword == '!open':
         await _open(*args)
+        return
+    # Command: close poll and display results
+    if keyword == '!close':
+        await _close(*args)
         return
 
 
@@ -367,7 +378,7 @@ async def _pass(author, user, channel, args):
 async def _apply(author, user, channel, args):
     """
     Allow user to apply as a candidate to a current poll
-    Usage: `!apply [--poll <poll_id>]`
+    Usage: `!apply [--poll <poll_id> --proposal <text>]`
     :param author: Discord message author
     :param user: Database user
     :param channel: Discord channel
@@ -377,8 +388,9 @@ async def _apply(author, user, channel, args):
     # Argument parser
     parser = Parser(
         prog='!apply',
-        description="Permet de postuler en tant que candidat au scrutin.")
+        description="Permet de postuler en tant que candidat au scrutin avec ou sans proposition.")
     parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
+    parser.add_argument('--proposal', '-P', type=str, help="Texte de la proposition (si autorisé par le scrutin)")
     args = parser.parse_args(args)
     if parser.message:
         await author.send(f"```{parser.message}```")
@@ -389,17 +401,37 @@ async def _apply(author, user, channel, args):
     if not poll:
         return
     # Create candidate
-    candidate, created = Candidate.get_or_create(user=user, poll=poll)
-    if created:
+    if poll.proposals:
+        if not args.proposal:
+            await author.send(
+                f":no_entry:  Ce scrutin nécessite que vous ajoutiez une proposition à votre candidature, "
+                f"vous pouvez le faire en utilisant le paramètre `--proposal \"<proposition>\"`.")
+            return
+        candidate, created = Candidate.get_or_create(user=user, poll=poll, proposal=args.proposal)
+        if created:
+            await author.send(
+                f":white_check_mark:  Votre proposition **{args.proposal}** "
+                f"(`{candidate.id}`) à l'élection de **{poll}** (`{poll.id}`) a été enregistrée !")
+            if hasattr(channel, 'topic'):
+                await channel.send(
+                    f":raised_hand:  <@{user.id}> a ajouté la proposition **{args.proposal}** "
+                    f"(`{candidate.id}`) à l'élection de **{poll.name}** (`{poll.id}`) !")
+            return
         await author.send(
-            f":white_check_mark:  Vous avez postulé avec succès en tant "
-            f"que candidat à l'élection de **{poll}** (`{poll.id}`) !")
-        if hasattr(channel, 'topic'):
-            await channel.send(
-                f":raised_hand:  <@{user.id}> se porte candidat à "
-                f"l'élection de **{poll.name}** (`{poll.id}`) !")
-        return
-    await author.send(f":no_entry:  Vous êtes déjà candidat à l'élection de **{poll}** (`{poll.id}`) !")
+            f":no_entry:  Vous avez déjà ajouté la proposition **{args.proposal}** "
+            f"(`{candidate.id}`) à l'élection de **{poll}** (`{poll.id}`) !")
+    else:
+        candidate, created = Candidate.get_or_create(user=user, poll=poll)
+        if created:
+            await author.send(
+                f":white_check_mark:  Vous avez postulé avec succès en tant "
+                f"que candidat à l'élection de **{poll}** (`{poll.id}`) !")
+            if hasattr(channel, 'topic'):
+                await channel.send(
+                    f":raised_hand:  <@{user.id}> se porte candidat à "
+                    f"l'élection de **{poll.name}** (`{poll.id}`) !")
+            return
+        await author.send(f":no_entry:  Vous êtes déjà candidat à l'élection de **{poll}** (`{poll.id}`) !")
 
 
 async def _leave(author, user, channel, args):
@@ -417,6 +449,7 @@ async def _leave(author, user, channel, args):
         prog='!leave',
         description="Permet de retirer sa candidature au scrutin.")
     parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
+    parser.add_argument('--proposal', '-P', type=int, help="Identifiant de la proposition")
     args = parser.parse_args(args)
     if parser.message:
         await author.send(f"```{parser.message}```")
@@ -427,15 +460,35 @@ async def _leave(author, user, channel, args):
     if not poll:
         return
     # Delete candidate
-    candidate = Candidate.get_or_none(user=user, poll=poll)
-    if candidate:
-        await author.send(
-            f":white_check_mark:  Vous vous êtes retiré avec succès en tant "
-            f"que candidat à l'élection de **{poll}** !")
-        if hasattr(channel, 'topic'):
-            await channel.send(f":door:  <@{user.id}> se retire en tant que candidat l'élection de **{poll.name}** !")
-        return
-    await author.send(f":no_entry:  Vous n'êtes pas candidat à l'élection de **{poll}** !")
+    if poll.proposals:
+        if not args.proposal:
+            await author.send(
+                f":no_entry:  Vous devez fournir l'identifiant de la "
+                f"proposition à retirer à l'aide du paramètre `--proposal <id>`.")
+            return
+        candidate = Candidate.get_or_none(user=user, poll=poll, id=args.proposal)
+        if candidate:
+            candidate.delete()
+            await author.send(
+                f":white_check_mark:  Vous avez retiré avec succès votre proposition "
+                f"**{candidate.proposal}** à l'élection de **{poll}** (`{poll.id}`) !")
+            if hasattr(channel, 'topic'):
+                await channel.send(
+                    f":door:  <@{user.id}> retire sa proposition **{candidate.proposal}** "
+                    f"à l'élection de **{poll}** (`{poll.id}`) !")
+            return
+        await author.send(f":no_entry:  Vous n'avez pas cette proposition à l'élection de **{poll}** (`{poll.id}`) !")
+    else:
+        candidate = Candidate.get_or_none(user=user, poll=poll)
+        if candidate:
+            candidate.delete()
+            await author.send(
+                f":white_check_mark:  Vous vous êtes retiré avec succès en tant "
+                f"que candidat à l'élection de **{poll}** !")
+            if hasattr(channel, 'topic'):
+                await channel.send(f":door:  <@{user.id}> se retire en tant que candidat l'élection de **{poll}** !")
+            return
+        await author.send(f":no_entry:  Vous n'êtes pas candidat à l'élection de **{poll}** (`{poll.id}`) !")
 
 
 async def _vote(author, user, channel, args):
@@ -520,7 +573,10 @@ async def _info(author, user, channel, args):
     # Build message
     message = [f"Voici la liste des candidats actuels au scrutin **{poll}** (`{poll.id}`) :"]
     for candidate in Candidate.select().join(User).order_by(Candidate.indice.asc(), User.name.asc()):
-        message.append(f"{get_icon(candidate.indice)}  **{candidate.user.name}**")
+        if poll.proposals:
+            message.append(f"{get_icon(candidate.indice)}  **{candidate.proposal}** (par {candidate.user.name})")
+        else:
+            message.append(f"{get_icon(candidate.indice)}  **{candidate.user.name}**")
     message = '\n'.join(message)
     # Send message
     if user.admin and hasattr(channel, 'topic'):
@@ -531,8 +587,8 @@ async def _info(author, user, channel, args):
 
 async def _new(author, user, channel, args):
     """
-    Create a new poll
-    Usage: `!new <name>`
+    Create a new poll and open it for candidates
+    Usage: `!new <name> [--winners <count> --proposals]`
     :param author: Discord message author
     :param user: Database user
     :param channel: Discord channel
@@ -542,14 +598,16 @@ async def _new(author, user, channel, args):
     # Argument parser
     parser = Parser(
         prog='!new',
-        description="Permet de créer un nouveau scrutin.")
+        description="Permet de créer un nouveau scrutin et l'ouvre aux candidatures.")
     parser.add_argument('name', type=str, help="Nom du scrutin")
+    parser.add_argument('--winners', '-w', type=int, help="Nombre de vainqueurs")
+    parser.add_argument('--proposals', '-p', action='store_true', help="Propositions ?")
     args = parser.parse_args(args)
     if parser.message:
         await author.send(f"```{parser.message}```")
         return
     # Create new poll
-    poll = Poll.create(name=args.name, salt=get_salt())
+    poll = Poll.create(name=args.name, salt=get_salt(), winners=args.winners or 1, proposals=args.proposals)
     # Message to user/channel
     message = f":ballot_box:  Le scrutin **{poll}** (`{poll.id}`) a été créé et ouvert aux candidatures, " \
               f"vous pouvez utiliser la commande `!apply` pour vous présenter (ou `!leave` pour vous retirer) !"
@@ -561,8 +619,8 @@ async def _new(author, user, channel, args):
 
 async def _open(author, user, channel, args):
     """
-    Create a new poll
-    Usage: `!new <name>`
+    Open an existing poll to vote
+    Usage: `!open [--poll <poll_id>]`
     :param author: Discord message author
     :param user: Database user
     :param channel: Discord channel
@@ -599,6 +657,28 @@ async def _open(author, user, channel, args):
         await channel.send(message)
     else:
         await author.send(message)
+
+
+async def _close(author, user, channel, args):
+    """
+    Close an existing poll and display results
+    Usage: `!close [--poll <poll_id>]`
+    :param author: Discord message author
+    :param user: Database user
+    :param channel: Discord channel
+    :param args: Command arguments
+    :return: Nothing
+    """
+    # Argument parser
+    parser = Parser(
+        prog='!close',
+        description="Ferme le vote à un scrutin et affiche les résultats.")
+    parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
+    args = parser.parse_args(args)
+    if parser.message:
+        await author.send(f"```{parser.message}```")
+        return
+    # TODO:
 
 
 if __name__ == '__main__':
