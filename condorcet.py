@@ -130,6 +130,7 @@ class Candidate(pw.Model):
     user = pw.ForeignKeyField(User)
     proposal = pw.CharField(null=True)
     indice = pw.CharField(null=True)
+    winner = pw.BooleanField(default=False)
     date = pw.DateTimeField(default=datetime.now)
 
     class Meta:
@@ -207,6 +208,46 @@ def hash(message):
     hash = hashlib.sha256()
     hash.update(str(message).encode())
     return base64.urlsafe_b64encode(hash.digest()).decode()
+
+
+def get_results(poll, save=False):
+    """
+    Compute Schulze ballot results
+    :param poll: Poll instance
+    :param save: Save results
+    :return: Results
+    """
+    votes = {}
+    for vote in Vote.select().where(Vote.poll == poll):
+        votes.setdefault(vote.choices, 0)
+        votes[vote.choices] += 1
+    inputs = []
+    for choices, count in votes.items():
+        inputs.append(dict(count=count, ballot=[[choice] for choice in choices.split()]))
+    if poll.winners == 1:
+        from py3votecore.schulze_method import SchulzeMethod
+        outputs = SchulzeMethod(
+            inputs,
+            ballot_notation=SchulzeMethod.BALLOT_NOTATION_GROUPING
+        ).as_dict()
+        if save:
+            winner = outputs['winner']
+            Candidate.update(winner=True).where(
+                Candidate.poll == poll, Candidate.indice == winner
+            ).execute()
+    else:
+        from py3votecore.schulze_stv import SchulzeSTV
+        outputs = SchulzeSTV(
+            inputs,
+            required_winners=poll.winners,
+            ballot_notation=SchulzeSTV.BALLOT_NOTATION_GROUPING
+        ).as_dict()
+        if save:
+            winners = outputs['winners']
+            Candidate.update(winner=True).where(
+                Candidate.poll == poll, Candidate.indice.in_(winners)
+            ).execute()
+    return outputs
 
 
 async def get_user(user):
@@ -678,7 +719,89 @@ async def _close(author, user, channel, args):
     if parser.message:
         await author.send(f"```{parser.message}```")
         return
-    # TODO:
+    # Get active and votable polls
+    polls = Poll.select().where(~Poll.open_apply & Poll.open_vote)
+    poll = await handle_poll(polls, args, author)
+    if not poll:
+        return
+    # Update poll
+    poll.open_apply = False
+    poll.open_vote = False
+    poll.save(only=('open_apply', 'open_vote', ))
+    # Compute results
+    get_results(poll, save=True)
+    # Display winners
+    votes = Vote.select(Vote.id).where(Vote.poll == poll).count()  # Count total votes
+    candidates = Candidate.select(Candidate.id).where(Candidate.poll == poll).count()  # Count total candidates
+    winners = Candidate.select().join(User).where(
+        Candidate.poll == poll, Candidate.winner
+    ).order_by(Candidate.proposal.asc(), User.name.asc())
+    winners = ', '.join([
+        f"{get_icon(winner.indice)}  **{winner.proposal}** (par <@{winner.user_id}>)" if poll.proposals else
+        f"{get_icon(winner.indice)}  <@{winner.user_id}>" for winner in winners])
+    message = (
+        f":trophy:  Les élections de **{poll}** sont désormais terminées, "
+        f"il y a eu **{votes}** votes pour **{candidates}** candidatures. "
+        f"Merci à tous pour votre participation !\n"
+        f"Les vainqueurs sont : {winners} ! Félicitations !")
+    if hasattr(channel, 'topic'):
+        await channel.send(message)
+    else:
+        await author.send(message)
+
+
+def test_condorcet_multiple():
+    """
+    Unit tests of Cordorcet system
+    :return: Nothing
+    """
+    # Create database and tables (if not existing)
+    database.create_tables((User, Poll, Candidate, Vote))
+    # Create poll
+    poll = Poll.create(
+        name="Test Condorcet Multiple",
+        salt=get_salt(),
+        winners=3,
+        proposals=False,
+        open_apply=False,
+        open_vote=False)
+    # Create users and candidates
+    users = 'A B C D E'
+    for ident, indice in enumerate(users.split(), start=1):
+        user, created = User.get_or_create(id=ident, defaults=dict(name=indice))
+        Candidate.create(poll=poll, user=user, indice=indice)
+    # Create votes
+    inputs = [
+        ('A B C D E', 60),
+        ('A C E B D', 45),
+        ('A D B E C', 30),
+        ('A E D C B', 15),
+        ('B A E D C', 12),
+        ('B C D E A', 48),
+        ('B D A C E', 39),
+        ('B E C A D', 21),
+        ('C A D B E', 27),
+        ('C B A E D', 9),
+        ('C D E A B', 51),
+        ('C E B D A', 33),
+        ('D A C E B', 42),
+        ('D B E C A', 18),
+        ('D C B A E', 6),
+        ('D E A B C', 54),
+        ('E A B C D', 57),
+        ('E B D A C', 36),
+        ('E C A D B', 24),
+        ('E D C B A', 3)]
+    index = 0
+    for choices, count in inputs:
+        for i in range(count):
+            index += 1
+            Vote.create(user=f"{index:03}", poll=poll, choices=choices)
+    # Compute results
+    results = get_results(poll, save=True)
+    # Assert results
+    winners, expected = results['winners'], {'A', 'D', 'E'}
+    assert winners == expected, f"Fail! Expected: {expected}, Got: {winners}"
 
 
 if __name__ == '__main__':
