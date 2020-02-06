@@ -76,6 +76,10 @@ ICONS = {
 }
 # User cache (avoid extra SQL queries)
 USERS = {}
+# Discord token
+DISCORD_TOKEN = os.environ.get('DISCORD_TOKEN')
+# Discord operator
+DISCORD_OPERATOR = OP = os.environ.get('DISCORD_OPERATOR') or '!'
 
 # Discord client
 client = discord.Client()
@@ -286,7 +290,7 @@ async def on_message(message):
         keyword, *args = content.split()
     args = author, user, channel, args
     # Ignore messages not starting with keyword symbol
-    if not keyword.startswith('!'):
+    if not keyword.startswith(OP):
         return
     # Logging commands for information purposes
     if hasattr(channel, 'name'):
@@ -299,41 +303,41 @@ async def on_message(message):
         await message.delete()
 
     # Command: set password
-    if keyword == '!pass':
+    if keyword == f'{OP}pass':
         await _pass(*args)
         return
     # Command: candidate to poll
-    if keyword == '!apply':
+    if keyword == f'{OP}apply':
         await _apply(*args)
         return
     # Command: resign candidature
-    if keyword == '!leave':
+    if keyword == f'{OP}leave':
         await _leave(*args)
         return
     # Command: vote on poll
-    if keyword == '!vote':
+    if keyword == f'{OP}vote':
         await _vote(*args)
         return
     # Command: information on candidates
-    if keyword == '!info':
+    if keyword == f'{OP}info':
         await _info(*args)
         return
 
     # At this point, all following commands are for administrators only
-    if keyword in ('!new', '!open', '!close') and not user.admin:
+    if keyword in (f'{OP}new', f'{OP}open', f'{OP}close') and not user.admin:
         await author.send(":no_entry:  Vous n'avez pas accès à cette fonctionnalité.")
         return
 
     # Command: new poll and open to candidates
-    if keyword == '!new':
+    if keyword == f'{OP}new':
         await _new(*args)
         return
     # Command: open poll to vote
-    if keyword == '!open':
+    if keyword == f'{OP}open':
         await _open(*args)
         return
     # Command: close poll and display results
-    if keyword == '!close':
+    if keyword == f'{OP}close':
         await _close(*args)
         return
 
@@ -382,7 +386,7 @@ async def _pass(author, user, channel, args):
         return
     # Argument parser
     parser = Parser(
-        prog='!pass',
+        prog=f'{OP}pass',
         description="Définit un mot de passe pour pouvoir voter anonymement aux scrutins.")
     parser.add_argument('password', type=str, help="Mot de passe (pour l'anonymat)")
     args = parser.parse_args(args)
@@ -407,7 +411,7 @@ async def _apply(author, user, channel, args):
     """
     # Argument parser
     parser = Parser(
-        prog='!apply',
+        prog=f'{OP}apply',
         description="Permet de postuler en tant que candidat au scrutin avec ou sans proposition.")
     parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
     parser.add_argument('--proposal', '-P', type=str, help="Texte de la proposition (si autorisé par le scrutin)")
@@ -466,7 +470,7 @@ async def _leave(author, user, channel, args):
     """
     # Argument parser
     parser = Parser(
-        prog='!leave',
+        prog=f'{OP}leave',
         description="Permet de retirer sa candidature au scrutin.")
     parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
     parser.add_argument('--proposal', '-P', type=int, help="Identifiant de la proposition")
@@ -523,7 +527,7 @@ async def _vote(author, user, channel, args):
     """
     # Argument parser
     parser = Parser(
-        prog='!vote',
+        prog=f'{OP}vote',
         description="Permet de voter à un scruting donné.")
     parser.add_argument('password', type=str, help="Mot de passe (pour l'anonymat)")
     parser.add_argument(
@@ -556,7 +560,7 @@ async def _vote(author, user, channel, args):
     elif hash(args.password) != user.password:
         await author.send(
             f":no_entry:  Votre mot de passe de scrutin est incorrect ou n'a pas encore configuré, "
-            f"utilisez la commande `!pass` pour le définir !")
+            f"utilisez la commande `{OP}pass` pour le définir !")
         return
     # Encrypt user with password and save vote choices
     encrypted, choices = encrypt(user.id, args.password), ' '.join(candidates)
@@ -579,7 +583,7 @@ async def _info(author, user, channel, args):
     """
     # Argument parser
     parser = Parser(
-        prog='!info',
+        prog=f'{OP}info',
         description="Permet de consulter la liste des candidats au scrutin.")
     parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
     args = parser.parse_args(args)
@@ -618,7 +622,7 @@ async def _new(author, user, channel, args):
     """
     # Argument parser
     parser = Parser(
-        prog='!new',
+        prog=f'{OP}new',
         description="Permet de créer un nouveau scrutin et l'ouvre aux candidatures.")
     parser.add_argument('name', type=str, help="Nom du scrutin")
     parser.add_argument('--winners', '-w', type=int, help="Nombre de vainqueurs")
@@ -631,7 +635,7 @@ async def _new(author, user, channel, args):
     poll = Poll.create(name=args.name, winners=args.winners or 1, proposals=args.proposals)
     # Message to user/channel
     message = f":ballot_box:  Le scrutin **{poll}** (`{poll.id}`) a été créé et ouvert aux candidatures, " \
-              f"vous pouvez utiliser la commande `!apply` pour vous présenter (ou `!leave` pour vous retirer) !"
+              f"vous pouvez utiliser la commande `{OP}apply` pour vous présenter (ou `{OP}leave` pour vous retirer) !"
     if hasattr(channel, 'topic'):
         await channel.send(message)
     else:
@@ -650,7 +654,7 @@ async def _open(author, user, channel, args):
     """
     # Argument parser
     parser = Parser(
-        prog='!open',
+        prog=f'{OP}open',
         description="Ferme la soumission des candidatures et ouvre l'accès au vote pour un scrutin.")
     parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
     args = parser.parse_args(args)
@@ -673,7 +677,7 @@ async def _open(author, user, channel, args):
     # Message to user/channel
     message = (
         f":ballot_box:  Les candidatures au scrutin **{poll}** (`{poll.id}`) sont désormais fermées et les votes "
-        f"sont ouverts, vous pouvez voter en utilisant la commande `!vote` et voir les candidats avec `!info` !")
+        f"sont ouverts, vous pouvez voter en utilisant la commande `{OP}vote` et voir les candidats avec `{OP}info` !")
     if hasattr(channel, 'topic'):
         await channel.send(message)
     else:
@@ -692,7 +696,7 @@ async def _close(author, user, channel, args):
     """
     # Argument parser
     parser = Parser(
-        prog='!close',
+        prog=f'{OP}close',
         description="Ferme le vote à un scrutin et affiche les résultats.")
     parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
     args = parser.parse_args(args)
@@ -785,4 +789,4 @@ def test_condorcet_multiple():
 
 if __name__ == '__main__':
     database.create_tables((User, Poll, Candidate, Vote))
-    client.run(os.environ.get('DISCORD_TOKEN'))
+    client.run(DISCORD_TOKEN)
