@@ -647,7 +647,7 @@ async def _new(author, user, channel, args):
     if hasattr(channel, 'topic'):
         # Save channel for announcements
         poll.channel = channel.id
-        poll.save(only=('channel', ))
+        poll.save(only=('channel_id', ))
         await channel.send(message)
     else:
         await author.send(message)
