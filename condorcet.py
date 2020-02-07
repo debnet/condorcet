@@ -111,6 +111,7 @@ class Poll(pw.Model):
     Poll
     """
     name = pw.CharField()
+    channel_id = pw.BigIntegerField(null=True)
     winners = pw.SmallIntegerField(default=1)
     proposals = pw.BooleanField(default=False)
     open_apply = pw.BooleanField(default=True)
@@ -367,6 +368,9 @@ async def handle_poll(polls, args, author):
             f":no_entry:  Aucun scrutin n'est ouvert à cette fonctionnalité "
             f"ou le scrutin sélectionné n'est pas valide.")
         return
+    # Get Discord channel
+    poll.channel = None if not poll.channel_id else (
+        discord.utils.get(client.get_all_channels(), id=poll.channel_id))
     return poll
 
 
@@ -424,6 +428,7 @@ async def _apply(author, user, channel, args):
     poll = await handle_poll(polls, args, author)
     if not poll:
         return
+    channel = poll.channel or channel
     # Create candidate
     if poll.proposals:
         if not args.proposal:
@@ -483,6 +488,7 @@ async def _leave(author, user, channel, args):
     poll = await handle_poll(polls, args, author)
     if not poll:
         return
+    channel = poll.channel or channel
     # Delete candidate
     if poll.proposals:
         if not args.proposal:
@@ -543,6 +549,7 @@ async def _vote(author, user, channel, args):
     poll = await handle_poll(polls, args, author)
     if not poll:
         return
+    channel = poll.channel or channel
     # Check if all candidates where selected and sorted
     candidates = list(map(str.upper, args.candidates))
     possibles = Candidate.select(Candidate.indice).where(
@@ -595,6 +602,7 @@ async def _info(author, user, channel, args):
     poll = await handle_poll(polls, args, author)
     if not poll:
         return
+    channel = poll.channel or channel
     # Build message
     message = [f"Voici la liste des candidats actuels au scrutin **{poll}** (`{poll.id}`) :"]
     for candidate in Candidate.select().join(User).order_by(Candidate.indice.asc(), User.name.asc()):
@@ -637,6 +645,9 @@ async def _new(author, user, channel, args):
     message = f":ballot_box:  Le scrutin **{poll}** (`{poll.id}`) a été créé et ouvert aux candidatures, " \
               f"vous pouvez utiliser la commande `{OP}apply` pour vous présenter (ou `{OP}leave` pour vous retirer) !"
     if hasattr(channel, 'topic'):
+        # Save channel for announcements
+        poll.channel = channel.id
+        poll.save(only=('channel', ))
         await channel.send(message)
     else:
         await author.send(message)
@@ -666,6 +677,7 @@ async def _open(author, user, channel, args):
     poll = await handle_poll(polls, args, author)
     if not poll:
         return
+    channel = poll.channel or channel
     # Update poll
     poll.open_apply = False
     poll.open_vote = True
@@ -708,6 +720,7 @@ async def _close(author, user, channel, args):
     poll = await handle_poll(polls, args, author)
     if not poll:
         return
+    channel = poll.channel or channel
     # Update poll
     poll.open_apply = False
     poll.open_vote = False
