@@ -646,7 +646,7 @@ async def _new(author, user, channel, args):
               f"vous pouvez utiliser la commande `{OP}apply` pour vous présenter (ou `{OP}leave` pour vous retirer) !"
     if hasattr(channel, 'topic'):
         # Save channel for announcements
-        poll.channel = channel.id
+        poll.channel_id = channel.id
         poll.save(only=('channel_id', ))
         await channel.send(message)
     else:
