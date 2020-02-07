@@ -739,8 +739,11 @@ async def _close(author, user, channel, args):
     message = (
         f":trophy:  Les élections de **{poll}** sont désormais terminées, "
         f"il y a eu **{votes}** votes pour **{candidates}** candidatures. "
-        f"Merci à tous pour votre participation !\n"
-        f"Les vainqueurs sont : {winners} ! Félicitations !")
+        f"Merci à tous pour votre participation !\n")
+    if poll.winners > 1:
+        message += f"Les vainqueurs sont : {winners} ! Félicitations !"
+    else:
+        message += f"Le vainqueur est : {winners} ! Félicitations !"
     if hasattr(channel, 'topic'):
         await channel.send(message)
     else:
