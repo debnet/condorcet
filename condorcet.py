@@ -605,7 +605,7 @@ async def _info(author, user, channel, args):
     channel = poll.channel or channel
     # Build message
     message = [f"Voici la liste des candidats actuels au scrutin **{poll}** (`{poll.id}`) :"]
-    for candidate in Candidate.select().join(User).order_by(Candidate.indice.asc(), User.name.asc()):
+    for candidate in Candidate.select(Candidate, User).join(User).order_by(Candidate.indice.asc(), User.name.asc()):
         if poll.proposals:
             message.append(f"{get_icon(candidate.indice)}  **{candidate.proposal}** (par {candidate.user.name})")
         else:
@@ -683,7 +683,7 @@ async def _open(author, user, channel, args):
     poll.open_vote = True
     poll.save(only=('open_apply', 'open_vote', ))
     # Assign letter to every candidate
-    for i, candidate in enumerate(Candidate.select().join(User).order_by(User.name.asc())):
+    for i, candidate in enumerate(Candidate.select(Candidate, User).join(User).order_by(User.name.asc())):
         candidate.indice = INDICES[i]
         candidate.save(only=('indice', ))
     # Message to user/channel
@@ -730,7 +730,7 @@ async def _close(author, user, channel, args):
     # Display winners
     votes = Vote.select(Vote.id).where(Vote.poll == poll).count()  # Count total votes
     candidates = Candidate.select(Candidate.id).where(Candidate.poll == poll).count()  # Count total candidates
-    winners = Candidate.select().join(User).where(
+    winners = Candidate.select(Candidate, User).join(User).where(
         Candidate.poll == poll, Candidate.winner
     ).order_by(Candidate.proposal.asc(), User.name.asc())
     winners = ', '.join([
