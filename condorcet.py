@@ -93,7 +93,6 @@ class User(pw.Model):
     """
     id = pw.BigIntegerField(primary_key=True)
     name = pw.CharField()
-    password = pw.CharField(null=True)
     admin = pw.BooleanField(default=False)
 
     def __str__(self):
@@ -122,6 +121,18 @@ class Poll(pw.Model):
 
     def __repr__(self):
         return self.name
+
+    class Meta:
+        database = database
+
+
+class Password(pw.Model):
+    """
+    Password
+    """
+    poll = pw.ForeignKeyField(Poll)
+    user = pw.ForeignKeyField(User)
+    password = pw.CharField(null=True)
 
     class Meta:
         database = database
@@ -172,26 +183,29 @@ def get_icon(indice):
     return ICONS.get(indice, f':regional_indicator_{indice.lower()}:')
 
 
-def encrypt(message, password):
+def encrypt(password, *messages):
     """
     Encrypt message with Fernet algorithm
-    :param message: Message to encrypt
     :param password: Password
+    :param messages: Messages to encrypt
     :return: Base64 encrypted string
     """
-    encrypted = hmac.new(msg=str(message).encode(), key=str(password).encode())
-    return base64.urlsafe_b64encode(encrypted.digest())
+    encrypted = hmac.new(key=str(password).encode())
+    for message in messages:
+        encrypted.update(str(message).encode())
+    return base64.urlsafe_b64encode(encrypted.digest()).decode()
 
 
-def hash(message):
+def hash(*messages):
     """
     Hash message with SHA256 algorithm
-    :param message: Message to hash
+    :param messages: Messages to hash
     :return: Base64 hashed string
     """
-    hash = hashlib.sha256()
-    hash.update(str(message).encode())
-    return base64.urlsafe_b64encode(hash.digest()).decode()
+    hashed = hashlib.sha256()
+    for message in messages:
+        hashed.update(str(message).encode())
+    return base64.urlsafe_b64encode(hashed.digest()).decode()
 
 
 def get_results(poll, save=False):
@@ -384,23 +398,28 @@ async def _pass(author, user, channel, args):
     :param args: Command arguments
     :return: Nothing
     """
-    # If user already has a password
-    if user.password:
-        await author.send(":no_entry:  Vous avez déjà défini un mot de passe.")
-        return
     # Argument parser
     parser = Parser(
         prog=f'{OP}pass',
         description="Définit un mot de passe pour pouvoir voter anonymement aux scrutins.")
     parser.add_argument('password', type=str, help="Mot de passe (pour l'anonymat)")
+    parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
     args = parser.parse_args(args)
     if parser.message:
         await author.send(f"```{parser.message}```")
         return
+    # Get active and appliable polls
+    polls = Poll.select().where(Poll.open_apply & ~Poll.open_vote)
+    poll = await handle_poll(polls, args, author)
+    if not poll:
+        return
     # Encoding and saving password for the user
-    user.password = hash(args.password)
-    user.save(only=('password', ))
-    await author.send(f":white_check_mark:  Votre mot de passe a été défini avec succès.")
+    password, created = Password.get_or_create(poll=poll, user=user, defaults=dict(password=hash(args.password)))
+    if not created:
+        # If user already has a password
+        await author.send(":no_entry:  Vous avez déjà défini un mot de passe pour ce scruting.")
+        return
+    await author.send(f":white_check_mark:  Votre mot de passe de scrutin a été défini avec succès.")
 
 
 async def _apply(author, user, channel, args):
@@ -440,11 +459,11 @@ async def _apply(author, user, channel, args):
         if created:
             await author.send(
                 f":white_check_mark:  Votre proposition **{args.proposal}** "
-                f"(`{candidate.id}`) à l'élection de **{poll}** (`{poll.id}`) a été enregistrée !")
+                f"(`{candidate.id}`) au scrutin de **{poll}** (`{poll.id}`) a été enregistrée !")
             if hasattr(channel, 'topic'):
                 await channel.send(
                     f":raised_hand:  <@{user.id}> a ajouté la proposition **{args.proposal}** "
-                    f"(`{candidate.id}`) à l'élection de **{poll.name}** (`{poll.id}`) !")
+                    f"(`{candidate.id}`) au scrutin de **{poll.name}** (`{poll.id}`) !")
             return
         await author.send(
             f":no_entry:  Vous avez déjà ajouté la proposition **{args.proposal}** "
@@ -454,11 +473,11 @@ async def _apply(author, user, channel, args):
         if created:
             await author.send(
                 f":white_check_mark:  Vous avez postulé avec succès en tant "
-                f"que candidat à l'élection de **{poll}** (`{poll.id}`) !")
+                f"que candidat au scrutin de **{poll}** (`{poll.id}`) !")
             if hasattr(channel, 'topic'):
                 await channel.send(
-                    f":raised_hand:  <@{user.id}> se porte candidat à "
-                    f"l'élection de **{poll.name}** (`{poll.id}`) !")
+                    f":raised_hand:  <@{user.id}> se porte candidat "
+                    f"au scrutin de **{poll.name}** (`{poll.id}`) !")
             return
         await author.send(f":no_entry:  Vous êtes déjà candidat à l'élection de **{poll}** (`{poll.id}`) !")
 
@@ -501,11 +520,11 @@ async def _leave(author, user, channel, args):
             candidate.delete_instance()
             await author.send(
                 f":white_check_mark:  Vous avez retiré avec succès votre proposition "
-                f"**{candidate.proposal}** à l'élection de **{poll}** (`{poll.id}`) !")
+                f"**{candidate.proposal}** au scrutin de **{poll}** (`{poll.id}`) !")
             if hasattr(channel, 'topic'):
                 await channel.send(
                     f":door:  <@{user.id}> retire sa proposition **{candidate.proposal}** "
-                    f"à l'élection de **{poll}** (`{poll.id}`) !")
+                    f"au scrutin de **{poll}** (`{poll.id}`) !")
             return
         await author.send(f":no_entry:  Vous n'avez pas cette proposition à l'élection de **{poll}** (`{poll.id}`) !")
     else:
@@ -549,7 +568,6 @@ async def _vote(author, user, channel, args):
     poll = await handle_poll(polls, args, author)
     if not poll:
         return
-    channel = poll.channel or channel
     # Check if all candidates where selected and sorted
     candidates = list(map(str.upper, args.candidates))
     possibles = Candidate.select(Candidate.indice).where(
@@ -560,11 +578,9 @@ async def _vote(author, user, channel, args):
         await author.send(f":no_entry:  Vous n'avez pas sélectionné et/ou classé l'ensemble des candidats !")
         return
     # Create new password for user
-    if not user.password:
-        user.password = hash(args.password)
-        user.save(only=('password', ))
+    password, created = Password.get_or_create(poll=poll, user=user, defaults=dict(password=hash(args.password)))
     # ... or verify user password
-    elif hash(args.password) != user.password:
+    if not created and hash(args.password) != password.password:
         await author.send(
             f":no_entry:  Votre mot de passe de scrutin est incorrect ou n'a pas encore configuré, "
             f"utilisez la commande `{OP}pass` pour le définir !")
@@ -602,7 +618,6 @@ async def _info(author, user, channel, args):
     poll = await handle_poll(polls, args, author)
     if not poll:
         return
-    channel = poll.channel or channel
     # Build message
     message = [f"Voici la liste des candidats actuels au scrutin **{poll}** (`{poll.id}`) :"]
     for candidate in Candidate.select(Candidate, User).join(User).order_by(Candidate.indice.asc(), User.name.asc()):
@@ -613,6 +628,7 @@ async def _info(author, user, channel, args):
     message = '\n'.join(message)
     # Send message
     if user.admin and hasattr(channel, 'topic'):
+        channel = poll.channel or channel
         await channel.send(message)
     else:
         await author.send(message)
@@ -804,5 +820,5 @@ def test_condorcet_multiple():
 
 
 if __name__ == '__main__':
-    database.create_tables((User, Poll, Candidate, Vote))
+    database.create_tables((User, Poll, Password, Candidate, Vote))
     client.run(DISCORD_TOKEN)
