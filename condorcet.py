@@ -586,7 +586,7 @@ async def _vote(author, user, channel, args):
             f"utilisez la commande `{OP}pass` pour le définir !")
         return
     # Encrypt user with password and save vote choices
-    encrypted, choices = encrypt(user.id, args.password), ' '.join(candidates)
+    encrypted, choices = encrypt(args.password, user.id), ' '.join(candidates)
     vote, created = Vote.get_or_create(user=encrypted, poll=poll, defaults=dict(choices=choices))
     if not created:
         vote.choices = choices
