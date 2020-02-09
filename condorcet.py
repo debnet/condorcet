@@ -409,7 +409,7 @@ async def _pass(author, user, channel, args):
         await author.send(f"```{parser.message}```")
         return
     # Get active and appliable polls
-    polls = Poll.select().where(Poll.open_apply & ~Poll.open_vote)
+    polls = Poll.select().where(Poll.open_apply | Poll.open_vote)
     poll = await handle_poll(polls, args, author)
     if not poll:
         return
