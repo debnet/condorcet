@@ -177,7 +177,7 @@ class Condorcet(commands.Cog):
         self.users = {}
 
     async def cog_command_error(self, ctx, error):
-        logger.error(f"{ctx.message}: {error}")
+        logger.error(error)
 
     @commands.command(name='pass')
     async def _pass(self, ctx, *args):
@@ -649,8 +649,8 @@ class Condorcet(commands.Cog):
             poll = polls.where(Poll.id == args.poll).first()
         if not poll:
             await author.send(
-                f":no_entry:  Aucun scrutin n'est ouvert à cette fonctionnalité "
-                f"ou le scrutin sélectionné n'est pas valide.")
+                f":no_entry:  Aucun scrutin n'est ouvert à cette "
+                f"fonctionnalité ou le scrutin sélectionné n'est pas valide.")
             return
         # Get Discord channel
         poll.channel = None if not poll.channel_id else (
