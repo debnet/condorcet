@@ -177,13 +177,21 @@ class BaseCog(commands.Cog):
     """
     Base Discord Cog with utility functions
     """
+    _users = {}
 
     def __init__(self, bot):
         self.bot = bot
-        self.users = {}
+        self.users = BaseCog._users
+
+    @commands.Cog.listener()
+    async def on_member_update(self, before, after):
+        if not after.bot:
+            await self.get_user(after)
 
     async def cog_command_error(self, ctx, error):
-        logger.error(error)
+        await ctx.author.send(
+            f":warning:  **Erreur :** {error} (`{ctx.message.content}` on **{ctx.message.channel.name}**)")
+        logger.error(f"[{ctx.message.channel.name}] {error} ({ctx.message.content})")
 
     async def get_user(self, user):
         """
@@ -257,7 +265,7 @@ class Condorcet(BaseCog):
         user = await self.get_user(ctx.author)
         # Argument parser
         parser = Parser(
-            prog=f'{OP}pass',
+            prog=f'{ctx.prefix}{ctx.command.name}',
             description="Définit un mot de passe pour pouvoir voter anonymement aux scrutins.")
         parser.add_argument('password', type=str, help="Mot de passe (pour l'anonymat)")
         parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
@@ -293,7 +301,7 @@ class Condorcet(BaseCog):
         user = await self.get_user(ctx.author)
         # Argument parser
         parser = Parser(
-            prog=f'{OP}apply',
+            prog=f'{ctx.prefix}{ctx.command.name}',
             description="Permet de postuler en tant que candidat au scrutin avec ou sans proposition.")
         parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
         parser.add_argument('--proposal', '-P', type=str, help="Texte de la proposition (si autorisé par le scrutin)")
@@ -354,7 +362,7 @@ class Condorcet(BaseCog):
         user = await self.get_user(ctx.author)
         # Argument parser
         parser = Parser(
-            prog=f'{OP}leave',
+            prog=f'{ctx.prefix}{ctx.command.name}',
             description="Permet de retirer sa candidature au scrutin.")
         parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
         parser.add_argument('--proposal', '-P', type=int, help="Identifiant de la proposition")
@@ -416,7 +424,7 @@ class Condorcet(BaseCog):
         user = await self.get_user(ctx.author)
         # Argument parser
         parser = Parser(
-            prog=f'{OP}vote',
+            prog=f'{ctx.prefix}{ctx.command.name}',
             description="Permet de voter à un scruting donné.")
         parser.add_argument('password', type=str, help="Mot de passe (pour l'anonymat)")
         parser.add_argument(
@@ -448,7 +456,7 @@ class Condorcet(BaseCog):
         if not created and self.hash(args.password) != password.password:
             await ctx.author.send(
                 f":no_entry:  Votre mot de passe de scrutin est incorrect ou n'a pas encore configuré, "
-                f"utilisez la commande `{OP}pass` pour le définir !")
+                f"utilisez la commande `{ctx.prefix}pass` pour le définir !")
             return
         # Encrypt user with password and save vote choices
         encrypted, choices = self.encrypt(args.password, user.id), ' '.join(candidates)
@@ -472,7 +480,7 @@ class Condorcet(BaseCog):
         user = await self.get_user(ctx.author)
         # Argument parser
         parser = Parser(
-            prog=f'{OP}info',
+            prog=f'{ctx.prefix}{ctx.command.name}',
             description="Permet de consulter la liste des candidats au scrutin.")
         parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
         args = parser.parse_args(args)
@@ -517,7 +525,7 @@ class Condorcet(BaseCog):
         user = await self.get_user(ctx.author)
         # Argument parser
         parser = Parser(
-            prog=f'{OP}new',
+            prog=f'{ctx.prefix}{ctx.command.name}',
             description="Permet de créer un nouveau scrutin et l'ouvre aux candidatures.")
         parser.add_argument('name', type=str, help="Nom du scrutin")
         parser.add_argument('--winners', '-w', type=int, help="Nombre de vainqueurs")
@@ -531,7 +539,7 @@ class Condorcet(BaseCog):
         # Message to user/channel
         message = (
             f":ballot_box:  Le scrutin **{poll}** (`{poll.id}`) a été créé et ouvert aux candidatures, "
-            f"vous pouvez utiliser la commande `{OP}apply` pour vous présenter (ou `{OP}leave` pour vous retirer) !")
+            f"vous pouvez utiliser la commande `{ctx.prefix}apply` pour vous présenter (ou `{ctx.prefix}leave` pour vous retirer) !")
         if hasattr(ctx.channel, 'topic'):
             # Save channel for announcements
             poll.channel_id = ctx.channel.id
@@ -555,7 +563,7 @@ class Condorcet(BaseCog):
         user = await self.get_user(ctx.author)
         # Argument parser
         parser = Parser(
-            prog=f'{OP}open',
+            prog=f'{ctx.prefix}{ctx.command.name}',
             description="Ferme la soumission des candidatures et ouvre l'accès au vote pour un scrutin.")
         parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
         args = parser.parse_args(args)
@@ -580,7 +588,7 @@ class Condorcet(BaseCog):
         message = (
             f":ballot_box:  Les candidatures au scrutin **{poll}** (`{poll.id}`) "
             f"sont désormais fermées et les votes sont ouverts, vous pouvez voter en "
-            f"utilisant la commande `{OP}vote` et voir les candidats avec `{OP}info` !")
+            f"utilisant la commande `{ctx.prefix}vote` et voir les candidats avec `{ctx.prefix}info` !")
         if channel and hasattr(channel, 'topic'):
             await channel.send(message)
         else:
@@ -601,7 +609,7 @@ class Condorcet(BaseCog):
         user = await self.get_user(ctx.author)
         # Argument parser
         parser = Parser(
-            prog=f'{OP}close',
+            prog=f'{ctx.prefix}{ctx.command.name}',
             description="Ferme le vote à un scrutin et affiche les résultats.")
         parser.add_argument('--poll', '-p', type=str, help="Identifiant de scrutin")
         args = parser.parse_args(args)
@@ -654,7 +662,7 @@ class Condorcet(BaseCog):
 
     def encrypt(self, password, *messages):
         """
-        Encrypt message with Fernet algorithm
+        Encrypt message with HMAC algorithm
         :param password: Password
         :param messages: Messages to encrypt
         :return: Base64 encrypted string
@@ -760,8 +768,8 @@ class HappyBirthday(BaseCog):
     @commands.command(name='birthday')
     async def _birthday(self, ctx, *args):
         """
-        Close an existing poll and display results
-        Usage: `!close [--poll <poll_id>]`
+        Save or remove birthday from database
+        Usage: `!birthday <date>`
         :param ctx: Discord context
         :param args: Command arguments
         :return: Nothing
@@ -788,7 +796,7 @@ class HappyBirthday(BaseCog):
         else:
             birthday = Birthday.select().where(Birthday.user == user).first()
             if not birthday:
-                await ctx.author.send(f"```usage: {OP}birthday date```")
+                await ctx.author.send(f"```usage: {ctx.prefix}birthday date```")
                 return
             birthday.delete_instance()
             await ctx.author.send(f":white_check_mark:  Votre date de naissance a été supprimée !")
@@ -834,7 +842,7 @@ class RoleManager(BaseCog):
         help_roles = ",\n".join(f"- {rolename} ({shortcut})" for (shortcut, rolename) in list_roles)
         # Argument parser
         parser = Parser(
-            prog=f'{OP}role',
+            prog=f'{ctx.prefix}{ctx.command.name}',
             description="Permet de s'attribuer un ou plusieurs rôles.",
             epilog=f"Rôles disponibles :\n{help_roles}",
             formatter_class=argparse.RawTextHelpFormatter)
