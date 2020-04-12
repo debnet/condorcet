@@ -774,7 +774,6 @@ class HappyBirthday(BaseCog):
         :param args: Command arguments
         :return: Nothing
         """
-        logger.info(", ".join(map(str, self.bot.get_all_channels())))
         if ctx.channel and hasattr(ctx.channel, 'topic'):
             await ctx.message.delete()
         user = await self.get_user(ctx.author)
