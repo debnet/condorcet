@@ -477,6 +477,13 @@ class Economy(BaseCog):
 
     @commands.command(name='loto')
     async def _loto(self, ctx, *args):
+        """
+        Buy a loto grid for the current draw
+        Usage: `!loto <number> <number> <number> <number> <number>`
+        :param ctx: Discord context
+        :param args: Command arguments
+        :return: Nothing
+        """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
         user = await self.get_user(ctx.author)
@@ -544,7 +551,14 @@ class Economy(BaseCog):
 
     @commands.command(name='draw')
     @commands.has_role(DISCORD_ADMIN)
-    async def _run_loto(self, ctx=None):
+    async def _draw(self, ctx=None):
+        """
+        Force the loto event loop to run at the current date
+        Usage: `!draw`
+        :param ctx: Discord context
+        :param args: Command arguments
+        :return: Nothing
+        """
         if ctx and ctx.channel and hasattr(ctx.channel, 'name'):
             channel = ctx.channel
             await ctx.message.delete()
@@ -634,4 +648,4 @@ class Economy(BaseCog):
         """
         Event loop for lotto draw results
         """
-        await self._run_loto()
+        await self._draw()
