@@ -293,7 +293,7 @@ class Economy(BaseCog):
             return
         # Get currency infos
         base = self.get_currency(DISCORD_MONEY_SYMBOL)
-        total = Balance.select(pw.fn.SUM(Balance.value)).where(Balance.currency == currency).scalar()
+        total = Balance.select(pw.fn.SUM(Balance.value)).where(Balance.currency == currency).scalar() or 0.0
         rate = round(currency.value * currency.rate / (total or 1), 5)
         # Display infos
         messages = [
@@ -388,7 +388,7 @@ class Economy(BaseCog):
             return
         # Get currency rate
         base_balance = self.get_balance(user, base)
-        total = Balance.select(pw.fn.SUM(Balance.value)).where(Balance.currency == currency).scalar()
+        total = Balance.select(pw.fn.SUM(Balance.value)).where(Balance.currency == currency).scalar() or 0.0
         value = round(args.amount * (currency.value * currency.rate / (total or 1)), 5)
         # Update
         balance.value -= args.amount
