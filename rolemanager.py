@@ -36,7 +36,7 @@ class RoleManager(BaseCog):
             description="Permet de s'attribuer un ou plusieurs rôles.",
             epilog=f"Rôles disponibles :\n{help_roles}",
             formatter_class=argparse.RawTextHelpFormatter)
-        parser.add_argument('roles', metavar='role', type=str, nargs='+', help="Rôle")
+        parser.add_argument('roles', metavar='role', type=str, nargs='*', help="Rôle")
         args = parser.parse_args(args)
         if parser.message:
             await ctx.author.send(f"```{parser.message}```")
