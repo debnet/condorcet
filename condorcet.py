@@ -1,96 +1,12 @@
 # coding: utf-8
-import argparse
 import base64
 import discord
 import hashlib
 import hmac
-import logging
-import os
-import re
 import peewee as pw
-from datetime import date, datetime
-from dateutil.parser import parse as parse_date
-from discord import utils
-from discord.ext import commands, tasks
-from string import ascii_uppercase, digits
-
-
-# Discord token
-DISCORD_TOKEN = os.environ.get('DISCORD_TOKEN')
-# Discord operator
-DISCORD_OPERATOR = OP = os.environ.get('DISCORD_OPERATOR') or '!'
-# Discord administrator role
-DISCORD_ADMIN = os.environ.get('DISCORD_ADMIN') or 'Staff'
-# Discord default channel
-DISCORD_CHANNEL = os.environ.get('DISCORD_CHANNEL') or 'general'
-# Discord roles allowed to be granted to users
-DISCORD_ROLES = os.environ.get('DISCORD_ROLES')
-
-
-class Parser(argparse.ArgumentParser):
-    """
-    Custom parser to avoid script to hang when an CLI error occurs
-    and keeping the error message in memory for feedback purposes
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.message = ''
-
-    def parse_args(self, args=None, namespace=None):
-        result = self.parse_known_args(args, namespace)
-        if self.message:
-            return
-        args, argv = result
-        return args
-
-    def print_help(self, file=None):
-        if self.message:
-            return
-        self.message = self.format_help()
-
-    def error(self, message):
-        if self.message:
-            return
-        self.message = self.format_usage() + message
-
-    def exit(self, status=0, message=None):
-        pass
-
-
-# Log handler in CLI with date and level
-log_handler = logging.StreamHandler()
-log_handler.setFormatter(logging.Formatter('[%(asctime)s] %(levelname)7s: %(message)s'))
-
-# Log SQL queries
-pw_logger = logging.getLogger('peewee')
-pw_logger.setLevel(logging.DEBUG)
-pw_logger.addHandler(log_handler)
-
-# Log application messages
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-logger.addHandler(log_handler)
-
-# Database handler
-database = pw.SqliteDatabase('condorcet.db')
-
-
-class User(pw.Model):
-    """
-    User
-    """
-    id = pw.BigIntegerField(primary_key=True)
-    name = pw.CharField()
-
-    def __str__(self):
-        return self.name
-
-    def __repr__(self):
-        return self.name
-
-    class Meta:
-        database = database
+from datetime import datetime
+from discord.ext import commands
+from base import DISCORD_ADMIN, BaseCog, Parser, User, database
 
 
 class Poll(pw.Model):
@@ -160,96 +76,14 @@ class Vote(pw.Model):
         )
 
 
-class Birthday(pw.Model):
-    """
-    Birthday
-    """
-    user = pw.ForeignKeyField(User, primary_key=True)
-    birth_date = pw.DateField()
-    date_only = pw.BooleanField(default=False)
-    last_check = pw.DateField(null=True)
-
-    class Meta:
-        database = database
-
-
-class BaseCog(commands.Cog):
-    """
-    Base Discord Cog with utility functions
-    """
-    _users = {}
-
-    def __init__(self, bot):
-        self.bot = bot
-        self.users = BaseCog._users
-
-    @commands.Cog.listener()
-    async def on_member_update(self, before, after):
-        if not after.bot:
-            await self.get_user(after)
-
-    async def cog_command_error(self, ctx, error):
-        await ctx.author.send(
-            f":warning:  **Erreur :** {error} (`{ctx.message.content}` on **{ctx.message.channel.name}**)")
-        logger.error(f"[{ctx.message.channel.name}] {error} ({ctx.message.content})")
-
-    async def get_user(self, user):
-        """
-        Helper function to get database user from a Discord user
-        :param user: Discord user
-        :return: Database user
-        """
-        if isinstance(user, str):
-            # Tries to get user id in mention
-            groups = re.match(r'<[@#](\d+)>', user)
-            if groups:
-                user_id = int(groups[1])
-                user = self.bot.get_user(user_id)
-            else:
-                # Search user from its username or nickname
-                user = utils.find(
-                    lambda u: user.lower() in (getattr(u, 'nick', u.name)).lower(),
-                    self.bot.get_all_members())
-        if not hasattr(user, 'id'):
-            # If not a Discord user
-            return None
-        # Try to get user from cache
-        name = getattr(user, 'nick', user.name) or user.name
-        _user = self.users.get(user.id)
-        # Create user if not exists
-        if not _user:
-            _user, created = User.get_or_create(id=user.id, defaults=dict(name=name))
-        # Update user name if changed on Discord
-        if name != _user.name:
-            _user.name = name
-            _user.save(only=('name', ))
-        # Keep Discord user
-        _user.user = user
-        # Cache user
-        self.users[_user.id] = _user
-        return _user
-
-
 class Condorcet(BaseCog):
     """
     Condorcet voting system bot
     """
 
-    # Indices for candidates
-    INDICES = ascii_uppercase + digits
-    # Indices icons
-    ICONS = {
-        '0': ':zero:',
-        '1': ':one:',
-        '2': ':two:',
-        '3': ':three:',
-        '4': ':four:',
-        '5': ':five:',
-        '6': ':six:',
-        '7': ':seven:',
-        '8': ':eight:',
-        '9': ':nine:',
-    }
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        database.create_tables((Poll, Password, Candidate, Vote, ))
 
     @commands.command(name='pass')
     async def _pass(self, ctx, *args):
@@ -260,7 +94,7 @@ class Condorcet(BaseCog):
         :param args: Command arguments
         :return: Nothing
         """
-        if ctx.channel and hasattr(ctx.channel, 'topic'):
+        if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
         user = await self.get_user(ctx.author)
         # Argument parser
@@ -296,7 +130,7 @@ class Condorcet(BaseCog):
         :param args: Command arguments
         :return: Nothing
         """
-        if ctx.channel and hasattr(ctx.channel, 'topic'):
+        if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
         user = await self.get_user(ctx.author)
         # Argument parser
@@ -357,7 +191,7 @@ class Condorcet(BaseCog):
         :param args: Command arguments
         :return: Nothing
         """
-        if ctx.channel and hasattr(ctx.channel, 'topic'):
+        if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
         user = await self.get_user(ctx.author)
         # Argument parser
@@ -419,7 +253,7 @@ class Condorcet(BaseCog):
         :param args: Command arguments
         :return: Nothing
         """
-        if ctx.channel and hasattr(ctx.channel, 'topic'):
+        if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
         user = await self.get_user(ctx.author)
         # Argument parser
@@ -475,7 +309,7 @@ class Condorcet(BaseCog):
         :param args: Command arguments
         :return: Nothing
         """
-        if ctx.channel and hasattr(ctx.channel, 'topic'):
+        if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
         user = await self.get_user(ctx.author)
         # Argument parser
@@ -504,7 +338,7 @@ class Condorcet(BaseCog):
         message = '\n'.join(message)
         # Send message
         is_admin = any(role.name == DISCORD_ADMIN for role in ctx.author.roles)
-        if is_admin and hasattr(ctx.channel, 'topic'):
+        if is_admin and hasattr(ctx.channel, 'name'):
             channel = poll.channel or ctx.channel
             await channel.send(message)
         else:
@@ -520,7 +354,7 @@ class Condorcet(BaseCog):
         :param args: Command arguments
         :return: Nothing
         """
-        if ctx.channel and hasattr(ctx.channel, 'topic'):
+        if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
         user = await self.get_user(ctx.author)
         # Argument parser
@@ -540,7 +374,7 @@ class Condorcet(BaseCog):
         message = (
             f":ballot_box:  Le scrutin **{poll}** (`{poll.id}`) a été créé et ouvert aux candidatures, "
             f"vous pouvez utiliser la commande `{ctx.prefix}apply` pour vous présenter (ou `{ctx.prefix}leave` pour vous retirer) !")
-        if hasattr(ctx.channel, 'topic'):
+        if hasattr(ctx.channel, 'name'):
             # Save channel for announcements
             poll.channel_id = ctx.channel.id
             poll.save(only=('channel_id', ))
@@ -558,7 +392,7 @@ class Condorcet(BaseCog):
         :param args: Command arguments
         :return: Nothing
         """
-        if ctx.channel and hasattr(ctx.channel, 'topic'):
+        if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
         user = await self.get_user(ctx.author)
         # Argument parser
@@ -604,7 +438,7 @@ class Condorcet(BaseCog):
         :param args: Command arguments
         :return: Nothing
         """
-        if ctx.channel and hasattr(ctx.channel, 'topic'):
+        if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
         user = await self.get_user(ctx.author)
         # Argument parser
@@ -649,16 +483,6 @@ class Condorcet(BaseCog):
             await channel.send(message)
         else:
             await ctx.author.send(message)
-
-    def get_icon(self, indice):
-        """
-        Get Discord icon for indice
-        :param indice: Indice
-        :return: Icon
-        """
-        if not indice:
-            return '> '
-        return self.ICONS.get(indice, f':regional_indicator_{indice.lower()}:')
 
     def encrypt(self, password, *messages):
         """
@@ -751,136 +575,3 @@ class Condorcet(BaseCog):
                     Candidate.poll == poll, Candidate.indice.in_(winners)
                 ).execute()
         return outputs
-
-
-class HappyBirthday(BaseCog):
-    """
-    Happy birthday bot
-    """
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._check_birthday.start()
-
-    def cog_unload(self):
-        self._check_birthday.cancel()
-
-    @commands.command(name='birthday')
-    async def _birthday(self, ctx, *args):
-        """
-        Save or remove birthday from database
-        Usage: `!birthday <date>`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
-        """
-        if ctx.channel and hasattr(ctx.channel, 'topic'):
-            await ctx.message.delete()
-        user = await self.get_user(ctx.author)
-        if args:
-            try:
-                birth_date = parse_date(args[0], dayfirst=True).date()
-            except:  # noqa
-                await ctx.author.send(f":warning:  La date de naissance saisie n'est pas valide.")
-                return
-            today = date.today()
-            date_only = birth_date.year == today.year
-            birthday, created = Birthday.get_or_create(
-                user=user, defaults=dict(birth_date=birth_date, date_only=date_only, last_check=today))
-            if not created:
-                birthday.birth_date, birthday.date_only, birthday.last_check = birth_date, date_only, today
-                birthday.save(only=('birth_date', 'date_only', ))
-            birth_date = birth_date.strftime("%d/%m") if date_only else birth_date.strftime("%d/%m/%Y")
-            await ctx.author.send(f":white_check_mark:  Votre date de naissance ({birth_date}) a bien été engistrée !")
-        else:
-            birthday = Birthday.select().where(Birthday.user == user).first()
-            if not birthday:
-                await ctx.author.send(f"```usage: {ctx.prefix}birthday date```")
-                return
-            birthday.delete_instance()
-            await ctx.author.send(f":white_check_mark:  Votre date de naissance a été supprimée !")
-
-    @tasks.loop(hours=1)
-    async def _check_birthday(self):
-        """
-        Event loop to announce birthdays
-        """
-        channel = discord.utils.get(self.bot.get_all_channels(), name=DISCORD_CHANNEL)
-        if not channel:
-            return
-        birthdays, today = [], date.today()
-        for birthday in Birthday.select().join(User).where(Birthday.last_check < today):
-            if (today.day, today.month) != (birthday.birth_date.day, birthday.birth_date.month):
-                continue
-            if birthday.date_only:
-                birthdays.append(f"<@{birthday.user.id}>")
-            else:
-                age = int((today - birthday.birth_date).days / 365)
-                birthdays.append(f"<@{birthday.user.id}> ({age} ans)")
-                birthday.last_check = today
-                birthday.save(only=('last_check', ))
-        if birthdays:
-            await channel.send(
-                f":birthday:  Nous fêtons **{len(birthdays)}** anniversaire(s) aujourd'hui ! "
-                f"Joyeux anniversaire à {','.join(birthdays)} !")
-
-
-class RoleManager(BaseCog):
-    """
-    Role manager bot
-    """
-
-    @commands.command(name='role')
-    @commands.guild_only()
-    async def _role(self, ctx, *args):
-        if ctx.channel and hasattr(ctx.channel, 'topic'):
-            await ctx.message.delete()
-        user = await self.get_user(ctx.author)
-        # Get roles
-        list_roles = [r.split("=") for r in DISCORD_ROLES.split(",")] if DISCORD_ROLES else []
-        help_roles = ",\n".join(f"- {rolename} ({shortcut})" for (shortcut, rolename) in list_roles)
-        # Argument parser
-        parser = Parser(
-            prog=f'{ctx.prefix}{ctx.command.name}',
-            description="Permet de s'attribuer un ou plusieurs rôles.",
-            epilog=f"Rôles disponibles :\n{help_roles}",
-            formatter_class=argparse.RawTextHelpFormatter)
-        parser.add_argument('roles', metavar='role', type=str, nargs='+', help="Rôle")
-        args = parser.parse_args(args)
-        if parser.message:
-            await ctx.author.send(f"```{parser.message}```")
-            return
-        # Collect all allowed roles
-        roles = {}
-        for role in ctx.guild.roles:
-            for shortcut, rolename in list_roles:
-                if role.name.lower() == rolename.lower():
-                    roles[shortcut] = role
-        # Collect selected roles
-        new_roles = []
-        selected_roles = map(str.lower, args.roles)
-        for shortcut, role in roles.items():
-            if shortcut.lower() in selected_roles:
-                new_roles.append(role)
-            elif role.name.lower() in selected_roles:
-                new_roles.append(role)
-        if not new_roles:
-            help_roles = ", ".join(f"**{rolename}** ({shortcut})" for (shortcut, rolename) in list_roles)
-            await ctx.author.send(f":warning:  Vous devez sélectionner un ou plusieurs rôles parmi : {help_roles}")
-            return
-        # Clear roles
-        old_roles = list(roles.values())
-        await ctx.author.remove_roles(*old_roles)
-        # Add roles
-        await ctx.author.add_roles(*new_roles)
-        role_names = ', '.join(role.name for role in new_roles)
-        await ctx.author.send(f":scroll:  Vous avez désormais accès aux rôles suivants : **{role_names}** !")
-
-
-if __name__ == '__main__':
-    database.create_tables((User, Poll, Password, Candidate, Vote, Birthday))
-    bot = commands.Bot(command_prefix=DISCORD_OPERATOR)
-    bot.add_cog(Condorcet(bot))
-    bot.add_cog(HappyBirthday(bot))
-    bot.add_cog(RoleManager(bot))
-    bot.run(DISCORD_TOKEN)
