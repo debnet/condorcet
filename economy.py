@@ -510,7 +510,7 @@ class Economy(BaseCog):
             (6, 6, 6): 15.0}
         values = list(slots.keys())
         results = choice(values), choice(values), choice(values)
-        result = args.amount * multipliers.get(results, 1.0 if len(set(results)) > 1 else 0.0)
+        result = args.amount * multipliers.get(results, 1.0 if len(set(results)) < 3 else 0.0)
         if result:
             balance.value += result
             Balance.update(value=Balance.value + result).where(Balance.id == balance.id).execute()
