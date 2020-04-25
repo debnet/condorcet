@@ -141,6 +141,8 @@ class BaseCog(commands.Cog):
         :param user: Discord user
         :return: Database user
         """
+        if user is None:
+            return None
         if isinstance(user, str):
             # Tries to get user id in mention
             groups = re.match(r'<[@!#]+(\d+)>', user)
@@ -154,7 +156,7 @@ class BaseCog(commands.Cog):
             # If not a Discord user
             return None
         # Try to get user from cache
-        name = getattr(user, 'nick', user.name) or user.name
+        name = getattr(user, 'nick', None) or user.name
         _user = self.users.get(user.id)
         # Create user if not exists
         if not _user:

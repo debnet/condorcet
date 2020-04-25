@@ -115,7 +115,7 @@ class Economy(BaseCog):
     async def _give(self, ctx, *args):
         """
         Permet de donner de l'argent à un autre utilisateur.
-        Usage : `!give <amount> <symbol> <user>`
+        Usage : `!give <montant> <symbole> <utilisateur>`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -179,7 +179,7 @@ class Economy(BaseCog):
     async def _store(self, ctx, *args):
         """
         Permet d'alimenter une devise pour augmenter sa valeur.
-        Usage : `!store <amount> <symbol>`
+        Usage : `!store <montant> <symbole>`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -228,7 +228,7 @@ class Economy(BaseCog):
     async def _create(self, ctx, *args):
         """
         Permet de créer une nouvelle devise.
-        Usage : `!create <symbol> "<name>"`
+        Usage : `!create <symbole> "<nom>"`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -261,7 +261,7 @@ class Economy(BaseCog):
     async def _delete(self, ctx, *args):
         """
         Permet de supprimer une devise créée.
-        Usage : `!delete <symbol>`
+        Usage : `!delete <symbole>`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -297,7 +297,7 @@ class Economy(BaseCog):
     async def _rate(self, ctx, *args):
         """
         Permet de consulter le taux d'une devise.
-        Usage : `!rate <symbol>`
+        Usage : `!rate <symbole>`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -373,7 +373,7 @@ class Economy(BaseCog):
     async def _market(self, ctx, *args):
         """
         Permet de consulter l'ensemble des devises existantes.
-        Usage : `!market`
+        Usage : `!market [<utilisateur>]`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -382,24 +382,40 @@ class Economy(BaseCog):
         parser = Parser(
             prog=f'{ctx.prefix}{ctx.command.name}',
             description="Permet de consulter l'ensemble des devises existantes.")
+        parser.add_argument('user', type=str, nargs='?', help="Utilisateur")
         args = parser.parse_args(args)
         if parser.message:
             await ctx.author.send(f"```{parser.message}```")
             return
+        # Check user
+        target = await self.get_user(args.user)
+        if args.user and not target:
+            await ctx.author.send(f":no_entry:  L'utilisateur ciblé n'existe pas.")
+            return
         # Display infos
         base = self.get_currency(DISCORD_MONEY_SYMBOL)
-        messages = ["Voici les devises existantes :"]
+        messages = [
+            f"Voici les devises créées par **{target.name}** :"
+            if target else "Voici toutes les devises existantes :"]
         currencies = (
             Currency.select(Currency, pw.fn.SUM(Balance.value).alias('total')).join(User, pw.JOIN.LEFT_OUTER)
         ).switch(Currency).join(Balance, pw.JOIN.LEFT_OUTER).group_by(Currency).order_by(pw.fn.Lower(Currency.name))
+        if target:
+            currencies = currencies.where(Currency.user == target)
         for currency in currencies:
             total = currency.total or 0
             value = (currency.value * currency.rate) / (total or 1)
             if currency.user:
-                messages.append(
-                    f"> **{currency.name}** ({currency.symbol}) créée par **{currency.user.name}** avec "
-                    f"**{round(total,2):n}** unités en circulation pour une valeur totale de "
-                    f"**{round(value,2):n} {base.symbol}**")
+                if target:
+                    messages.append(
+                        f"> **{currency.name}** ({currency.symbol}) avec "
+                        f"**{round(total, 2):n}** unités en circulation pour une valeur totale de "
+                        f"**{round(value, 2):n} {base.symbol}**")
+                else:
+                    messages.append(
+                        f"> **{currency.name}** ({currency.symbol}) créée par **{currency.user.name}** avec "
+                        f"**{round(total,2):n}** unités en circulation pour une valeur totale de "
+                        f"**{round(value,2):n} {base.symbol}**")
             else:
                 messages.append(
                     f"> **{currency.name}** ({currency.symbol}) devise principale avec "
@@ -418,7 +434,7 @@ class Economy(BaseCog):
     async def _sell(self, ctx, *args):
         """
         Permet de vendre une autre devise sur le marché global.
-        Usage : `!sell <amount> <symbol>`
+        Usage : `!sell <montant> <symbole>`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -472,7 +488,7 @@ class Economy(BaseCog):
     async def _slot(self, ctx, *args):
         """
         Joue une quantité d'argent à la machine à sous.
-        Usage : `!slot <amount>`
+        Usage : `!slot <montant>`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -551,7 +567,7 @@ class Economy(BaseCog):
     async def _loto(self, ctx, *args):
         """
         Permet d'enregistrer une participation au tirage du loto du jour.
-        Usage : `!loto <number> <number> <number> <number> <number>`
+        Usage : `!loto <nombre> <nombre> <nombre> <nombre> <nombre>`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
