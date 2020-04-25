@@ -394,16 +394,25 @@ class Economy(BaseCog):
         ).switch(Currency).join(Balance, pw.JOIN.LEFT_OUTER).group_by(Currency).order_by(pw.fn.Lower(Currency.name))
         for currency in currencies:
             total = currency.total or 0
-            value = total / ((currency.value * currency.rate) or 1)
+            value = (currency.value * currency.rate) / (total or 1)
             if currency.user:
                 messages.append(
-                    f"> **{currency.name}** ({currency.symbol}) par **{currency.user.name}** : "
-                    f"**{round(total,2):n}** en circulation, valeur totale = **{round(value,2):n} {base.symbol}**")
+                    f"> **{currency.name}** ({currency.symbol}) créée par **{currency.user.name}** avec "
+                    f"**{round(total,2):n}** unités en circulation pour une valeur totale de "
+                    f"**{round(value,2):n} {base.symbol}**")
             else:
                 messages.append(
-                    f"> **{currency.name}** ({currency.symbol}), devise principale : "
-                    f"**{round(total, 2):n}** en circulation")
-        await ctx.author.send("\n".join(messages))
+                    f"> **{currency.name}** ({currency.symbol}) devise principale avec "
+                    f"**{round(total, 2):n}** unités en circulation")
+        chunks, remaining = [], 2000
+        for message in messages:
+            if len(message) > remaining:
+                await ctx.author.send("\n".join(chunks))
+                chunks, remaining = [], 2000
+            chunks.append(message)
+            remaining -= len(message)
+        if chunks:
+            await ctx.author.send("\n".join(chunks))
 
     @commands.command(name='sell')
     async def _sell(self, ctx, *args):
