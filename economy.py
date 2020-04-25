@@ -502,25 +502,22 @@ class Economy(BaseCog):
             5: ':bell:',
             6: ':gem:'}
         multipliers = {
-            (1, 1, 1): 1.0,
-            (2, 2, 2): 2.0,
-            (3, 3, 3): 3.0,
+            (1, 1, 1): 2.0,
+            (2, 2, 2): 3.0,
+            (3, 3, 3): 4.0,
             (4, 4, 4): 5.0,
-            (5, 5, 5): 8.0,
+            (5, 5, 5): 10.0,
             (6, 6, 6): 15.0}
-        values = [1, 2, 3, 4, 5, 6]
+        values = list(slots.keys())
         results = choice(values), choice(values), choice(values)
-        result = args.amount * multipliers.get(results, 0.0)
+        result = args.amount * multipliers.get(results, 1.0 if len(set(results)) > 1 else 0.0)
         if result:
             balance.value += result
             Balance.update(value=Balance.value + result).where(Balance.id == balance.id).execute()
-            result = result - args.amount
-        # Display result
+        # Create display message
         slot1, slot2, slot3 = sorted(results, reverse=True)
-        message, endpoint = None, None
         messages = ["C'est parti !", f"{slots[slot1]}", f"{slots[slot2]}", f"{slots[slot3]}"]
-        is_channel = ctx.channel and hasattr(ctx.channel, 'name')
-        if is_channel:
+        if ctx.channel and hasattr(ctx.channel, 'name'):
             endpoint = ctx.channel
             if result:
                 messages.append(f"<@{user.id}> a remporté **{round(result,2):n} {currency.symbol}** ! :slight_smile:")
@@ -532,13 +529,15 @@ class Economy(BaseCog):
                 messages.append(f"Vous remportez **{round(result,2):n} {currency.symbol}** ! :slight_smile:")
             else:
                 messages.append(f"Vous perdez **{round(args.amount,2):n} {currency.symbol}** ! :frowning:")
-        for i in range(1, len(messages) + 1):
-            content = '  |  '.join(messages[:i])
-            if not message:
-                message = await endpoint.send(content)
-            else:
+        # Display slot machine
+        message = await endpoint.send(messages[0])
+        for i in range(1, len(results) + 1):
+            for value in sample(values, len(values)):
+                content = '  '.join(messages[:i] + [slots[value]])
                 await message.edit(content=content)
-            await asyncio.sleep(0.5)
+                await asyncio.sleep(0.5)
+        content = '  '.join(messages)
+        await message.edit(content=content)
 
     @commands.command(name='loto')
     async def _loto(self, ctx, *args):
