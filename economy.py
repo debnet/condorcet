@@ -114,11 +114,8 @@ class Economy(BaseCog):
     @commands.command(name='give')
     async def _give(self, ctx, *args):
         """
-        Give an amount of a specified currency to another user
-        Usage: `!give <amount> <symbol> <user>`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Permet de donner de l'argent à un autre utilisateur.
+        Usage : `!give <amount> <symbol> <user>`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -181,11 +178,8 @@ class Economy(BaseCog):
     @commands.command(name='store')
     async def _store(self, ctx, *args):
         """
-        Supply an amount of money to a specified currency to increase its value
-        Usage: `!store <amount> <symbol>`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Permet d'alimenter une devise pour augmenter sa valeur.
+        Usage : `!store <amount> <symbol>`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -210,8 +204,8 @@ class Economy(BaseCog):
             await ctx.author.send(f":no_entry:  La devise sélectionnée n'existe pas.")
             return
         # Check ownership
-        if currency.user != user:
-            await ctx.author.send(f":no_entry:  Cette devise ne vous appartient pas.")
+        if not currency.user:
+            await ctx.author.send(f":no_entry:  Il n'est pas possible d'alimenter cette devise.")
             return
         # Check balance
         base = self.get_currency(DISCORD_MONEY_SYMBOL)
@@ -233,11 +227,8 @@ class Economy(BaseCog):
     @commands.command(name='create')
     async def _create(self, ctx, *args):
         """
-        Create a new currency
-        Usage: `!create <symbol> <name>`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Permet de créer une nouvelle devise.
+        Usage : `!create <symbol> "<name>"`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -266,14 +257,47 @@ class Economy(BaseCog):
             f"Vous pouvez désormais en distribuer autant que vous le voulez avec `{ctx.prefix}give`, lui donner de la "
             f"valeur en l'approvisionnant avec `{ctx.prefix}store` et consulter son cours avec `{ctx.prefix}rate`.")
 
+    @commands.command(name='delete')
+    async def _delete(self, ctx, *args):
+        """
+        Permet de supprimer une devise créée.
+        Usage : `!delete <symbol>`
+        """
+        if ctx.channel and hasattr(ctx.channel, 'name'):
+            await ctx.message.delete()
+        user = await self.get_user(ctx.author)
+        # Argument parser
+        parser = Parser(
+            prog=f'{ctx.prefix}{ctx.command.name}',
+            description="Permet de supprimer une devise créée.",
+            add_help="Attention ! La suppression est définitive et les investissements ne seront pas remboursés.")
+        parser.add_argument('symbol', type=str, help="Symbole de la devise")
+        args = parser.parse_args(args)
+        if parser.message:
+            await ctx.author.send(f"```{parser.message}```")
+            return
+        # Check currency
+        currency = self.get_currency(args.symbol)
+        if not currency:
+            await ctx.author.send(f":no_entry:  La devise sélectionnée n'existe pas.")
+            return
+        if currency.user != user:
+            await ctx.author.send(f":no_entry:  Cette devise ne vous appartient pas.")
+            return
+        # Delete balances and currency
+        Balance.delete().where(Balance.currency == currency).execute()
+        currency.delete_instance()
+        # Empty caches
+        self.currencies.clear()
+        self.balances.clear()
+        await ctx.author.send(
+            f":white_check_mark:  La devise **{currency.name}** ({currency.symbol}) a été supprimée avec succès !")
+
     @commands.command(name='rate')
     async def _rate(self, ctx, *args):
         """
-        Create a new currency
-        Usage: `!devise <symbol> <name>`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Permet de consulter le taux d'une devise.
+        Usage : `!rate <symbol>`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -307,7 +331,8 @@ class Economy(BaseCog):
                 f"Valeur individuelle : **{round(rate,2):n} {base.symbol}**"])
         messages.append(f"Classement des 10 plus grosses fortunes en **{currency.name}** :")
         balances = Balance.select().join(User).where(
-            Balance.currency == currency).order_by(Balance.value.desc()).limit(10)
+            Balance.currency == currency
+        ).order_by(Balance.value.desc()).limit(10)
         for indice, balance in zip(self.RANKS, balances):
             indice = self.get_icon(indice)
             if currency == base:
@@ -321,11 +346,8 @@ class Economy(BaseCog):
     @commands.command(name='money')
     async def _money(self, ctx, *args):
         """
-        Display own balances
-        Usage: `!money`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Permet de consulter votre compte en banque.
+        Usage : `!money`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -342,19 +364,16 @@ class Economy(BaseCog):
         messages = ["Vous avez actuellement les devises suivantes sur votre compte :"]
         balances = Balance.select().join(Currency).where(
             Balance.user == user, Balance.value > 0
-        ).order_by(Currency.name)
+        ).order_by(pw.fn.Lower(Currency.name))
         for balance in balances:
             messages.append(f"> **{round(balance.value,2):n} {balance.currency.symbol}** ({balance.currency.name})")
         await ctx.author.send("\n".join(messages))
 
-    @commands.command(name='sell')
-    async def _sell(self, ctx, *args):
+    @commands.command(name='market')
+    async def market(self, ctx, *args):
         """
-        Sell currency on the global market
-        Usage: `!sell <amount> <symbol>`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Permet de consulter l'ensemble des devises existantes.
+        Usage : `!market`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -362,7 +381,44 @@ class Economy(BaseCog):
         # Argument parser
         parser = Parser(
             prog=f'{ctx.prefix}{ctx.command.name}',
-            description="Permet de vendre une autre devise.")
+            description="Permet de consulter l'ensemble des devises existantes.")
+        args = parser.parse_args(args)
+        if parser.message:
+            await ctx.author.send(f"```{parser.message}```")
+            return
+        # Display infos
+        base = self.get_currency(DISCORD_MONEY_SYMBOL)
+        messages = ["Voici les devises existantes :"]
+        currencies = (
+            Currency.select(Currency, pw.fn.SUM(Balance.value).alias('total')).join(User, pw.JOIN.LEFT_OUTER)
+        ).switch(Currency).join(Balance, pw.JOIN.LEFT_OUTER).group_by(Currency).order_by(pw.fn.Lower(Currency.name))
+        for currency in currencies:
+            total = currency.total or 0
+            value = total / ((currency.value * currency.rate) or 1)
+            if currency.user:
+                messages.append(
+                    f"> **{currency.name}** ({currency.symbol}) créée par **{currency.user.name}** avec "
+                    f"**{round(total,2):n}** unités en circulation d'une valeur de "
+                    f"**{round(value,2):n} {base.symbol}**")
+            else:
+                messages.append(
+                    f"> **{currency.name}** ({currency.symbol}) devise principale avec "
+                    f"**{round(total, 2):n}** unités en circulation")
+        await ctx.author.send("\n".join(messages))
+
+    @commands.command(name='sell')
+    async def _sell(self, ctx, *args):
+        """
+        Permet de vendre une autre devise sur le marché global.
+        Usage : `!sell <amount> <symbol>`
+        """
+        if ctx.channel and hasattr(ctx.channel, 'name'):
+            await ctx.message.delete()
+        user = await self.get_user(ctx.author)
+        # Argument parser
+        parser = Parser(
+            prog=f'{ctx.prefix}{ctx.command.name}',
+            description="Permet de vendre une autre devise sur le marché global.")
         parser.add_argument('amount', type=int, help="Quantité d'argent")
         parser.add_argument('symbol', type=str, help="Symbole de la devise")
         args = parser.parse_args(args)
@@ -407,11 +463,8 @@ class Economy(BaseCog):
     @commands.command(name='slot')
     async def _slot(self, ctx, *args):
         """
-        Play some money on machine slots
-        Usage: `!slot <amount>`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Joue une quantité d'argent à la machine à sous.
+        Usage : `!slot <amount>`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -490,11 +543,8 @@ class Economy(BaseCog):
     @commands.command(name='loto')
     async def _loto(self, ctx, *args):
         """
-        Buy a loto grid for the current draw
-        Usage: `!loto <number> <number> <number> <number> <number>`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Permet d'enregistrer une participation au tirage du loto du jour.
+        Usage : `!loto <number> <number> <number> <number> <number>`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -565,11 +615,8 @@ class Economy(BaseCog):
     @commands.has_role(DISCORD_ADMIN)
     async def _draw(self, ctx=None):
         """
-        Force the loto event loop to run at the current date
-        Usage: `!draw`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Force le tirage du loto pour la journée courante (admin uniquement).
+        Usage : `!draw`
         """
         if ctx and ctx.channel and hasattr(ctx.channel, 'name'):
             channel = ctx.channel

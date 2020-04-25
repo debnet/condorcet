@@ -18,11 +18,8 @@ class RoleManager(BaseCog):
     @commands.guild_only()
     async def _roles(self, ctx, *args):
         """
-        Change roles from a predefined list
-        Usage: `!roles <role> [<role> ...]`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Permet de s'attribuer un ou plusieurs rôles.
+        Usage : `!roles <role> [<role> ...]`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()

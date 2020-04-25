@@ -37,10 +37,7 @@ class HappyBirthday(BaseCog):
     async def _birthday(self, ctx, *args):
         """
         Save or remove birthday from database
-        Usage: `!birthday <date>`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Usage: `!birthday [<date>]`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()

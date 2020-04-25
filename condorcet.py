@@ -88,11 +88,8 @@ class Condorcet(BaseCog):
     @commands.command(name='pass')
     async def _pass(self, ctx, *args):
         """
-        Allow user to define a password to ensure its anonymity when voting
-        Usage: `!pass <password>`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Définit un mot de passe pour pouvoir voter anonymement aux scrutins.
+        Usage : `!pass <password>`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -124,11 +121,8 @@ class Condorcet(BaseCog):
     @commands.command(name='apply')
     async def _apply(self, ctx, *args):
         """
-        Allow user to apply as a candidate to a current poll
-        Usage: `!apply [--poll <poll_id> --proposal <text>]`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Permet de postuler en tant que candidat au scrutin avec ou sans proposition.
+        Usage : `!apply [--poll <poll_id> --proposal <text>]`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -185,11 +179,8 @@ class Condorcet(BaseCog):
     @commands.command(name='leave')
     async def _leave(self, ctx, *args):
         """
-        Allow user to apply as a candidate to a current poll
-        Usage: `!leave [--poll <poll_id>]`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Permet de retirer sa candidature au scrutin.
+        Usage : `!leave [--poll <poll_id>]`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -247,11 +238,8 @@ class Condorcet(BaseCog):
     @commands.command(name='vote')
     async def _vote(self, ctx, *args):
         """
-        Vote on a poll
-        Usage: `!vote <candidat> [<candidat> ...] --password <password> [--poll <poll_id>]`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Permet de voter à un scruting donné.
+        Usage : `!vote <candidat> [<candidat> ...] --password <password> [--poll <poll_id>]`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -259,7 +247,7 @@ class Condorcet(BaseCog):
         # Argument parser
         parser = Parser(
             prog=f'{ctx.prefix}{ctx.command.name}',
-            description="Permet de voter à un scruting donné.")
+            description="")
         parser.add_argument('password', type=str, help="Mot de passe (pour l'anonymat)")
         parser.add_argument(
             'candidates', metavar='candidat', type=str, nargs='+',
@@ -303,11 +291,8 @@ class Condorcet(BaseCog):
     @commands.command(name='info')
     async def _info(self, ctx, *args):
         """
-        Show candidates for a
-        Usage: `!info [--poll <poll_id>]`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Permet de consulter la liste des candidats au scrutin.
+        Usage : `!info [--poll <poll_id>]`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -348,11 +333,8 @@ class Condorcet(BaseCog):
     @commands.has_role(DISCORD_ADMIN)
     async def _new(self, ctx, *args):
         """
-        Create a new poll and open it for candidates
-        Usage: `!new <name> [--winners <count> --proposals]`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Permet de créer un nouveau scrutin et l'ouvre aux candidatures.
+        Usage : `!new <name> [--winners <count> --proposals]`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -386,11 +368,8 @@ class Condorcet(BaseCog):
     @commands.has_role(DISCORD_ADMIN)
     async def _open(self, ctx, *args):
         """
-        Open an existing poll to vote
-        Usage: `!open [--poll <poll_id>]`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Ferme la soumission des candidatures et ouvre l'accès au vote pour un scrutin.
+        Usage : `!open [--poll <poll_id>]`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -432,11 +411,8 @@ class Condorcet(BaseCog):
     @commands.has_role(DISCORD_ADMIN)
     async def _close(self, ctx, *args):
         """
-        Close an existing poll and display results
-        Usage: `!close [--poll <poll_id>]`
-        :param ctx: Discord context
-        :param args: Command arguments
-        :return: Nothing
+        Ferme le vote à un scrutin et affiche les résultats.
+        Usage : `!close [--poll <poll_id>]`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
