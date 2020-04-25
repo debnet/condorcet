@@ -1,4 +1,5 @@
 # coding: utf-8
+import asyncio
 import discord
 import os
 import peewee as pw
@@ -339,7 +340,9 @@ class Economy(BaseCog):
             return
         # Display infos
         messages = ["Vous avez actuellement les devises suivantes sur votre compte :"]
-        balances = Balance.select().join(Currency).where(Balance.user == user).order_by(Currency.name)
+        balances = Balance.select().join(Currency).where(
+            Balance.user == user, Balance.value > 0
+        ).order_by(Currency.name)
         for balance in balances:
             messages.append(f"> **{round(balance.value,2):n} {balance.currency.symbol}** ({balance.currency.name})")
         await ctx.author.send("\n".join(messages))
@@ -453,27 +456,36 @@ class Economy(BaseCog):
             (5, 5, 5): 8.0,
             (6, 6, 6): 15.0}
         values = [1, 2, 3, 4, 5, 6]
-        slot1, slot2, slot3 = choice(values), choice(values), choice(values)
-        result = args.amount * multipliers.get((slot1, slot2, slot3), 0.0)
+        results = choice(values), choice(values), choice(values)
+        result = args.amount * multipliers.get(results, 0.0)
         if result:
             balance.value += result
             Balance.update(value=Balance.value + result).where(Balance.id == balance.id).execute()
             result = result - args.amount
         # Display result
-        messages = [f"{slots[slot1]} {slots[slot2]} {slots[slot3]}"]
+        slot1, slot2, slot3 = sorted(results, reverse=True)
+        message, endpoint = None, None
+        messages = ["C'est parti !", f"{slots[slot1]}", f"{slots[slot2]}", f"{slots[slot3]}"]
         is_channel = ctx.channel and hasattr(ctx.channel, 'name')
         if is_channel:
+            endpoint = ctx.channel
             if result:
                 messages.append(f"<@{user.id}> a remporté **{round(result,2):n} {currency.symbol}** ! :slight_smile:")
             else:
                 messages.append(f"<@{user.id}> a perdu **{round(args.amount,2):n} {currency.symbol}** ! :frowning:")
-            await ctx.channel.send('  |  '.join(messages))
         else:
+            endpoint = ctx.author
             if result:
                 messages.append(f"Vous remportez **{round(result,2):n} {currency.symbol}** ! :slight_smile:")
             else:
                 messages.append(f"Vous perdez **{round(args.amount,2):n} {currency.symbol}** ! :frowning:")
-            await ctx.author.send('  |  '.join(messages))
+        for i in range(1, len(messages) + 1):
+            content = '  |  '.join(messages[:i])
+            if not message:
+                message = await endpoint.send(content)
+            else:
+                await message.edit(content=content)
+            await asyncio.sleep(0.5)
 
     @commands.command(name='loto')
     async def _loto(self, ctx, *args):
