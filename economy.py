@@ -370,7 +370,7 @@ class Economy(BaseCog):
         await ctx.author.send("\n".join(messages))
 
     @commands.command(name='market')
-    async def market(self, ctx, *args):
+    async def _market(self, ctx, *args):
         """
         Permet de consulter l'ensemble des devises existantes.
         Usage : `!market`
@@ -397,13 +397,12 @@ class Economy(BaseCog):
             value = total / ((currency.value * currency.rate) or 1)
             if currency.user:
                 messages.append(
-                    f"> **{currency.name}** ({currency.symbol}) créée par **{currency.user.name}** avec "
-                    f"**{round(total,2):n}** unités en circulation d'une valeur de "
-                    f"**{round(value,2):n} {base.symbol}**")
+                    f"> **{currency.name}** ({currency.symbol}) par **{currency.user.name}** : "
+                    f"**{round(total,2):n}** en circulation, valeur totale = **{round(value,2):n} {base.symbol}**")
             else:
                 messages.append(
-                    f"> **{currency.name}** ({currency.symbol}) devise principale avec "
-                    f"**{round(total, 2):n}** unités en circulation")
+                    f"> **{currency.name}** ({currency.symbol}), devise principale : "
+                    f"**{round(total, 2):n}** en circulation")
         await ctx.author.send("\n".join(messages))
 
     @commands.command(name='sell')
