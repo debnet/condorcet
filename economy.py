@@ -331,7 +331,7 @@ class Economy(BaseCog):
                 f"Valeur totale : **{round(currency.value,2):n} {base.symbol}**",
                 f"Valeur individuelle : **{round(rate,2):n} {base.symbol}**"])
         messages.append(f"Classement des 10 plus grosses fortunes en **{currency.name}** :")
-        balances = Balance.select().join(User).where(
+        balances = Balance.select(Balance, User).join(User).where(
             Balance.currency == currency
         ).order_by(Balance.value.desc()).limit(10)
         for indice, balance in zip(self.RANKS, balances):
@@ -363,7 +363,7 @@ class Economy(BaseCog):
             return
         # Display infos
         messages = ["Vous avez actuellement les devises suivantes sur votre compte :"]
-        balances = Balance.select().join(Currency).where(
+        balances = Balance.select(Balance, Currency).join(Currency).where(
             Balance.user == user, Balance.value > 0
         ).order_by(pw.fn.Lower(Currency.name))
         for balance in balances:
@@ -615,7 +615,8 @@ class Economy(BaseCog):
         Get currency from its symbol (create if not exists)
         """
         if symbol not in self.currencies:
-            currency = Currency.select().join(User, pw.JOIN.LEFT_OUTER).where(Currency.symbol == symbol).first()
+            currency = Currency.select(Currency, User).join(User, pw.JOIN.LEFT_OUTER).where(
+                Currency.symbol == symbol).first()
             if not currency:
                 if create:
                     self.currencies[symbol] = currency = Currency.create(
@@ -657,7 +658,7 @@ class Economy(BaseCog):
         loto.draw = ' '.join(map(str, sorted(loto_draw)))
         # Winner ranks
         ranks = {i: [] for i in range(DISCORD_LOTO_COUNT + 1)}
-        for grid in LotoGrid.select().join(User).where(LotoGrid.date == draw_date):
+        for grid in LotoGrid.select(LotoGrid, User).join(User).where(LotoGrid.date == draw_date):
             grid_draw = set(map(int, grid.draw.split()))
             ranks[len(loto_draw & grid_draw)].append(grid)
         # Total to gain
