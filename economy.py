@@ -398,7 +398,7 @@ class Economy(BaseCog):
             f"Voici les devises créées par **{target.name}** :"
             if target else "Voici toutes les devises existantes :"]
         currencies = (
-            Currency.select(Currency, pw.fn.SUM(Balance.value).alias('total')).join(User, pw.JOIN.LEFT_OUTER)
+            Currency.select(Currency, User, pw.fn.SUM(Balance.value).alias('total')).join(User, pw.JOIN.LEFT_OUTER)
         ).switch(Currency).join(Balance, pw.JOIN.LEFT_OUTER).group_by(Currency).order_by(pw.fn.Lower(Currency.name))
         if target:
             currencies = currencies.where(Currency.user == target)
