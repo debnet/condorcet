@@ -179,7 +179,7 @@ class Economy(BaseCog):
     async def _store(self, ctx, *args):
         """
         Permet d'alimenter une devise pour augmenter sa valeur.
-        Usage : `!store <montant> <symbole>`
+        Usage : `!store <symbole> <montant>`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
