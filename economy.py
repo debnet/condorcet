@@ -409,12 +409,12 @@ class Economy(BaseCog):
                 if target:
                     messages.append(
                         f"> **{currency.name}** ({currency.symbol}) avec "
-                        f"**{round(total, 2):n}** unités en circulation pour une valeur totale de "
+                        f"**{round(total, 2):n}** unités en circulation d'une valeur de "
                         f"**{round(value, 2):n} {base.symbol}**")
                 else:
                     messages.append(
                         f"> **{currency.name}** ({currency.symbol}) créée par **{currency.user.name}** avec "
-                        f"**{round(total,2):n}** unités en circulation pour une valeur totale de "
+                        f"**{round(total,2):n}** unités en circulation d'une valeur de "
                         f"**{round(value,2):n} {base.symbol}**")
             else:
                 messages.append(
