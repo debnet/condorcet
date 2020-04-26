@@ -423,11 +423,12 @@ class Economy(BaseCog):
                     f"**{round(total, 2):n}** unités en circulation")
         chunks, remaining = [], 2000
         for message in messages:
-            if len(message) > remaining:
+            length = len(message) + 1
+            if length > remaining:
                 await ctx.author.send("\n".join(chunks))
                 chunks, remaining = [], 2000
             chunks.append(message)
-            remaining -= len(message)
+            remaining -= length
         if chunks:
             await ctx.author.send("\n".join(chunks))
 
