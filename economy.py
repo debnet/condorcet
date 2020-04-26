@@ -270,7 +270,8 @@ class Economy(BaseCog):
         parser = Parser(
             prog=f'{ctx.prefix}{ctx.command.name}',
             description="Permet de supprimer une devise créée.",
-            add_help="Attention ! La suppression est définitive et les investissements ne seront pas remboursés.")
+            epilog="Attention ! La suppression d'une devise est définitive "
+                   "et ses investissements ne seront pas remboursés.")
         parser.add_argument('symbol', type=str, help="Symbole de la devise")
         args = parser.parse_args(args)
         if parser.message:
