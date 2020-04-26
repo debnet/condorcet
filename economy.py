@@ -707,7 +707,8 @@ class Economy(BaseCog):
                 list_winners = ", ".join(f"<@{w}> (_x{winners.count(w)}_)" for w in set(winners))
                 messages.append(
                     f"> **{rank} numéro(s)** pour **{round(gain,2):n} {currency.symbol}** : {list_winners}")
-        messages.append(f"La cagnotte du tirage d'aujourd'hui démarre donc à **{loto.value} {currency.symbol}**.")
+        messages.append(
+            f"La cagnotte du tirage d'aujourd'hui démarre donc à **{round(loto.value,2):n} {currency.symbol}**.")
         await channel.send('\n'.join(messages))
 
     @tasks.loop(hours=1)
