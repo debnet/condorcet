@@ -688,7 +688,7 @@ class Economy(BaseCog):
         loto.save(only=('draw',))
         loto, created = LotoDraw.get_or_create(
             date=date.today() + timedelta(days=1) if ctx else date.today(),
-            defaults=dict(value=total_gain - given_gain))
+            defaults=dict(value=max(total_gain - given_gain, DISCORD_LOTO_START)))
         # Display results
         draw = ' - '.join(f"{d:02}" for d in sorted(loto_draw))
         for i in range(10):
