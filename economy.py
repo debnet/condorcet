@@ -105,6 +105,8 @@ class Economy(BaseCog):
             return
         user = await self.get_user(message.author)
         value = round(len(escape_mentions(message.content).split()) * DISCORD_MONEY_RATE, 5)
+        if value <= 0.0:
+            return
         symbol, name = DISCORD_MONEY_SYMBOL, DISCORD_MONEY_NAME
         currency = self.get_currency(symbol, create=True, name=name)
         balance = self.get_balance(user, currency)
