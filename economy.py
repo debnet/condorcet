@@ -351,7 +351,7 @@ class Economy(BaseCog):
     async def _money(self, ctx, *args):
         """
         Permet de consulter votre compte en banque.
-        Usage : `!money`
+        Usage : `!money [<utilisateur>]`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -372,7 +372,7 @@ class Economy(BaseCog):
             return
         # Display infos
         if target:
-            messages = [f"**{user.name}** a actuellement :"]
+            messages = [f"**{target.name}** a actuellement :"]
         else:
             messages = ["Vous avez actuellement :"]
             target = user
