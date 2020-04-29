@@ -36,8 +36,8 @@ class HappyBirthday(BaseCog):
     @commands.command(name='birthday')
     async def _birthday(self, ctx, *args):
         """
-        Save or remove birthday from database
-        Usage: `!birthday [<date>]`
+        Sauvegarde ou supprime votre date de naissance
+        Usage : `!birthday [<date>]`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()

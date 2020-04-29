@@ -20,6 +20,7 @@ DISCORD_LOTO_CHANNEL = os.environ.get('DISCORD_LOTO_CHANNEL') or 'loto'
 DISCORD_LOTO_PRICE = float(os.environ.get('DISCORD_LOTO_PRICE') or 1.000)
 DISCORD_LOTO_COUNT = int(os.environ.get('DISCORD_LOTO_COUNT') or 5)
 DISCORD_LOTO_START = float(os.environ.get('DISCORD_LOTO_START') or 100.0)
+DISCORD_LOTO_EXTRA = float(os.environ.get('DISCORD_LOTO_EXTRA') or 10.0)
 
 
 class Currency(pw.Model):
@@ -148,7 +149,7 @@ class Economy(BaseCog):
             return
         # Check target
         target = await self.get_user(args.user)
-        if not target or target == user or target == currency.user:
+        if not target or target.user.bot or target == user or target == currency.user:
             await ctx.author.send(f":no_entry:  Le destinataire n'est pas valide.")
             return
         # Check balance
@@ -359,14 +360,24 @@ class Economy(BaseCog):
         parser = Parser(
             prog=f'{ctx.prefix}{ctx.command.name}',
             description="Permet de consulter votre compte en banque.")
+        parser.add_argument('user', type=str, nargs='?', help="Utilisateur")
         args = parser.parse_args(args)
         if parser.message:
             await ctx.author.send(f"```{parser.message}```")
             return
+        # Check user
+        target = await self.get_user(args.user)
+        if args.user and not target:
+            await ctx.author.send(f":no_entry:  L'utilisateur ciblé n'existe pas.")
+            return
         # Display infos
-        messages = ["Vous avez actuellement les devises suivantes sur votre compte :"]
+        if target:
+            messages = [f"**{user.name}** a actuellement :"]
+        else:
+            messages = ["Vous avez actuellement :"]
+            target = user
         balances = Balance.select(Balance, Currency).join(Currency).where(
-            Balance.user == user, Balance.value > 0
+            Balance.user == target, Balance.value > 0.001
         ).order_by(pw.fn.Lower(Currency.name))
         for balance in balances:
             messages.append(f"> **{round(balance.value,2):n} {balance.currency.symbol}** ({balance.currency.name})")
@@ -688,9 +699,11 @@ class Economy(BaseCog):
         LotoGrid.update(rank=0, gain=0).where(LotoGrid.date == draw_date, LotoGrid.rank.is_null()).execute()
         # Save draw and create new draw
         loto.save(only=('draw',))
+        extra_value = 0.0 if ranks[DISCORD_LOTO_COUNT] else DISCORD_LOTO_EXTRA
+        new_value = max(total_gain - given_gain + extra_value, DISCORD_LOTO_START)
         loto, created = LotoDraw.get_or_create(
             date=date.today() + timedelta(days=1) if ctx else date.today(),
-            defaults=dict(value=max(total_gain - given_gain, DISCORD_LOTO_START)))
+            defaults=dict(value=new_value))
         # Display results
         draw = ' - '.join(f"{d:02}" for d in sorted(loto_draw))
         for i in range(10):
