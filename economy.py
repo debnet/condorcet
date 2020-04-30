@@ -381,7 +381,16 @@ class Economy(BaseCog):
         ).order_by(pw.fn.Lower(Currency.name))
         for balance in balances:
             messages.append(f"> **{round(balance.value,2):n} {balance.currency.symbol}** ({balance.currency.name})")
-        await ctx.author.send("\n".join(messages))
+        chunks, remaining = [], 2000
+        for message in messages:
+            length = len(message) + 1
+            if length > remaining:
+                await ctx.author.send("\n".join(chunks))
+                chunks, remaining = [], 2000
+            chunks.append(message)
+            remaining -= length
+        if chunks:
+            await ctx.author.send("\n".join(chunks))
 
     @commands.command(name='market')
     async def _market(self, ctx, *args):
