@@ -18,6 +18,7 @@ DISCORD_MONEY_WAGE = float(os.environ.get('DISCORD_MONEY_WAGE') or 0.100)
 DISCORD_MONEY_LIMIT = float(os.environ.get('DISCORD_MONEY_LIMIT') or 1000)
 DISCORD_LOTO_CHANNEL = os.environ.get('DISCORD_LOTO_CHANNEL') or 'loto'
 DISCORD_LOTO_PRICE = float(os.environ.get('DISCORD_LOTO_PRICE') or 1.000)
+DISCORD_LOTO_LIMIT = float(os.environ.get('DISCORD_LOTO_LIMIT') or 100.0)
 DISCORD_LOTO_COUNT = int(os.environ.get('DISCORD_LOTO_COUNT') or 5)
 DISCORD_LOTO_START = float(os.environ.get('DISCORD_LOTO_START') or 100.0)
 DISCORD_LOTO_EXTRA = float(os.environ.get('DISCORD_LOTO_EXTRA') or 10.0)
@@ -613,17 +614,25 @@ class Economy(BaseCog):
                 f":no_entry:  Vous devez sélectionner **{DISCORD_LOTO_COUNT} numéros distincts** "
                 f"ayant une valeur comprise **entre 1 et 49**.")
             return
+        # Check loto
+        loto = LotoDraw.get_or_none(LotoDraw.date == date.today())
+        if not loto:
+            await ctx.author.send(
+                f":no_entry:  Il n'y a pas encore de tirage LOTO prévu pour aujourd'hui. "
+                f"Veuillez patienter jusqu'à ce que le tirage de la veille soit réalisé.")
+            return
         # Check balance
         currency = self.get_currency(DISCORD_MONEY_SYMBOL)
         balance = self.get_balance(user, currency)
-        if balance.value < DISCORD_LOTO_PRICE:
+        price = min(int(loto.value / DISCORD_LOTO_LIMIT) * DISCORD_LOTO_PRICE, DISCORD_LOTO_PRICE)
+        if balance.value < price:
             await ctx.author.send(
                 f":no_entry:  Vous n'avez pas assez d'argent sur votre compte : une grille coûte "
-                f"**{round(DISCORD_LOTO_PRICE,2):n} {currency.symbol}** et vous n'avez actuellement que "
+                f"**{round(price,2):n} {currency.symbol}** et vous n'avez actuellement que "
                 f"**{round(balance.value,2):n} {currency.symbol}**).")
             return
         # Pay and create grid
-        Balance.update(value=Balance.value - DISCORD_LOTO_PRICE).where(Balance.id == balance.id).execute()
+        Balance.update(value=Balance.value - price).where(Balance.id == balance.id).execute()
         grid = LotoGrid.create(user=user, draw=' '.join(map(str, numbers)))
         # Display information
         draw = ' - '.join(f"{d:02}" for d in numbers)
@@ -685,9 +694,10 @@ class Economy(BaseCog):
             grid_draw = set(map(int, grid.draw.split()))
             ranks[len(loto_draw & grid_draw)].append(grid)
         # Total to gain
+        old_price = min(int(loto.value / DISCORD_LOTO_LIMIT) * DISCORD_LOTO_PRICE, DISCORD_LOTO_PRICE)
         total_gain = loto.value + LotoGrid.select().where(
             LotoGrid.date == draw_date, LotoGrid.gain.is_null()
-        ).count() * DISCORD_LOTO_PRICE
+        ).count() * old_price
         # Gain rates
         n_max = DISCORD_LOTO_COUNT
         rates = {n: 2 ** (-n_max - 1 + n) + (2 ** -n_max) / n_max for n in range(n_max, 0, -1)}
@@ -713,6 +723,7 @@ class Economy(BaseCog):
         loto, created = LotoDraw.get_or_create(
             date=date.today() + timedelta(days=1) if ctx else date.today(),
             defaults=dict(value=new_value))
+        new_price = min(int(loto.value / DISCORD_LOTO_LIMIT) * DISCORD_LOTO_PRICE, DISCORD_LOTO_PRICE)
         # Display results
         draw = ' - '.join(f"{d:02}" for d in sorted(loto_draw))
         for i in range(10):
@@ -736,6 +747,10 @@ class Economy(BaseCog):
                     f"> **{rank} numéro(s)** pour **{round(gain,2):n} {currency.symbol}** : {list_winners}")
         messages.append(
             f"La cagnotte du tirage d'aujourd'hui démarre donc à **{round(loto.value,2):n} {currency.symbol}**.")
+        if old_price != new_price:
+            messages.append(
+                f":warning:  Attention ! Le prix de la grille évoluant avec la valeur de la cagnotte, "
+                f"elle coûte désormais **{round(new_price,2):n} {currency.symbol}** ({currency.name}).")
         await channel.send('\n'.join(messages))
 
     @tasks.loop(hours=1)
