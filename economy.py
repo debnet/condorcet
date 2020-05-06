@@ -624,7 +624,7 @@ class Economy(BaseCog):
         # Check balance
         currency = self.get_currency(DISCORD_MONEY_SYMBOL)
         balance = self.get_balance(user, currency)
-        price = min(int(loto.value / DISCORD_LOTO_LIMIT) * DISCORD_LOTO_PRICE, DISCORD_LOTO_PRICE)
+        price = max(int(loto.value / DISCORD_LOTO_LIMIT) * DISCORD_LOTO_PRICE, DISCORD_LOTO_PRICE)
         if balance.value < price:
             await ctx.author.send(
                 f":no_entry:  Vous n'avez pas assez d'argent sur votre compte : une grille coûte "
@@ -694,7 +694,7 @@ class Economy(BaseCog):
             grid_draw = set(map(int, grid.draw.split()))
             ranks[len(loto_draw & grid_draw)].append(grid)
         # Total to gain
-        old_price = min(int(loto.value / DISCORD_LOTO_LIMIT) * DISCORD_LOTO_PRICE, DISCORD_LOTO_PRICE)
+        old_price = max(int(loto.value / DISCORD_LOTO_LIMIT) * DISCORD_LOTO_PRICE, DISCORD_LOTO_PRICE)
         total_gain = loto.value + LotoGrid.select().where(
             LotoGrid.date == draw_date, LotoGrid.gain.is_null()
         ).count() * old_price
@@ -723,7 +723,7 @@ class Economy(BaseCog):
         loto, created = LotoDraw.get_or_create(
             date=date.today() + timedelta(days=1) if ctx else date.today(),
             defaults=dict(value=new_value))
-        new_price = min(int(loto.value / DISCORD_LOTO_LIMIT) * DISCORD_LOTO_PRICE, DISCORD_LOTO_PRICE)
+        new_price = max(int(loto.value / DISCORD_LOTO_LIMIT) * DISCORD_LOTO_PRICE, DISCORD_LOTO_PRICE)
         # Display results
         draw = ' - '.join(f"{d:02}" for d in sorted(loto_draw))
         for i in range(10):
