@@ -632,6 +632,7 @@ class Economy(BaseCog):
                 f"**{round(balance.value,2):n} {currency.symbol}**).")
             return
         # Pay and create grid
+        balance.value -= price
         Balance.update(value=Balance.value - price).where(Balance.id == balance.id).execute()
         grid = LotoGrid.create(user=user, draw=' '.join(map(str, numbers)))
         # Display information
@@ -716,6 +717,8 @@ class Economy(BaseCog):
                 Balance.currency == currency, Balance.user_id << [g.user_id for g in grids]
             ).execute()
         LotoGrid.update(rank=0, gain=0).where(LotoGrid.date == draw_date, LotoGrid.rank.is_null()).execute()
+        self.currencies.clear()
+        self.balances.clear()
         # Save draw and create new draw
         loto.save(only=('draw',))
         extra_value = 0.0 if ranks[DISCORD_LOTO_COUNT] else DISCORD_LOTO_EXTRA
