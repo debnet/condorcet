@@ -96,10 +96,12 @@ class Economy(BaseCog):
         self.balances = {}
         self.messages = {}
         self._pay_wage.start()
+        self._rate_money.start()
         self._draw_loto.start()
 
     def cog_unload(self):
         self._pay_wage.cancel()
+        self._rate_money.cancel()
         self._draw_loto.cancel()
 
     @commands.Cog.listener()
