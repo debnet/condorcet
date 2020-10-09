@@ -91,6 +91,7 @@ class Economy(BaseCog):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         database.create_tables((Currency, Balance, LotoDraw, LotoGrid))
+        Currency.get_or_create(symbol=DISCORD_MONEY_SYMBOL, name=DISCORD_MONEY_NAME)
         LotoDraw.get_or_create(defaults=dict(value=DISCORD_LOTO_START))
         self.currencies = {}
         self.balances = {}
