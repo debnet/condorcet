@@ -6,21 +6,25 @@ import peewee as pw
 from datetime import date, datetime, timedelta
 from discord.ext import commands, tasks
 from discord.utils import escape_mentions
-from random import choice, sample
+from random import choice, randint, sample, seed
 from base import DISCORD_ADMIN, BaseCog, Parser, User, database
 
 
 # Discord economy constants
 DISCORD_MONEY_SYMBOL = os.environ.get('DISCORD_MONEY_SYMBOL') or '$'
 DISCORD_MONEY_NAME = os.environ.get('DISCORD_MONEY_NAME') or 'dollar'
-DISCORD_MONEY_RATE = float(os.environ.get('DISCORD_MONEY_RATE') or 0.001)
-DISCORD_MONEY_WAGE = float(os.environ.get('DISCORD_MONEY_WAGE') or 0.100)
+DISCORD_MONEY_START = float(os.environ.get('DISCORD_MONEY_START') or 100.0)
+DISCORD_MONEY_MULT = float(os.environ.get('DISCORD_MONEY_MULT') or 0.01)
+DISCORD_MONEY_MINI = float(os.environ.get('DISCORD_MONEY_MINI') or 0.1)
+DISCORD_MONEY_RATE = float(os.environ.get('DISCORD_MONEY_RATE') or 0.99)
+DISCORD_MONEY_WAGE = float(os.environ.get('DISCORD_MONEY_WAGE') or 0.1)
 DISCORD_MONEY_LIMIT = float(os.environ.get('DISCORD_MONEY_LIMIT') or 1000)
+DISCORD_MONEY_CREATE = float(os.environ.get('DISCORD_MONEY_CREATE') or 10.0)
 DISCORD_LOTO_CHANNEL = os.environ.get('DISCORD_LOTO_CHANNEL') or 'loto'
-DISCORD_LOTO_PRICE = float(os.environ.get('DISCORD_LOTO_PRICE') or 1.000)
+DISCORD_LOTO_PRICE = float(os.environ.get('DISCORD_LOTO_PRICE') or 1.0)
 DISCORD_LOTO_LIMIT = float(os.environ.get('DISCORD_LOTO_LIMIT') or 100.0)
-DISCORD_LOTO_COUNT = int(os.environ.get('DISCORD_LOTO_COUNT') or 5)
-DISCORD_LOTO_START = float(os.environ.get('DISCORD_LOTO_START') or 100.0)
+DISCORD_LOTO_COUNT = int(os.environ.get('DISCORD_LOTO_COUNT') or 6)
+DISCORD_LOTO_START = float(os.environ.get('DISCORD_LOTO_START') or 5.0)
 DISCORD_LOTO_EXTRA = float(os.environ.get('DISCORD_LOTO_EXTRA') or 10.0)
 
 
@@ -91,11 +95,11 @@ class Economy(BaseCog):
         self.currencies = {}
         self.balances = {}
         self.messages = {}
-        self._paid_wage.start()
+        self._pay_wage.start()
         self._draw_loto.start()
 
     def cog_unload(self):
-        self._paid_wage.cancel()
+        self._pay_wage.cancel()
         self._draw_loto.cancel()
 
     @commands.Cog.listener()
@@ -106,7 +110,7 @@ class Economy(BaseCog):
         if message.author.bot or not message.guild:
             return
         user = await self.get_user(message.author)
-        value = round(len(escape_mentions(message.content).split()) * DISCORD_MONEY_RATE, 5)
+        value = round(len(escape_mentions(message.content).split()) * DISCORD_MONEY_MULT, 5)
         if value <= 0.0:
             return
         symbol, name = DISCORD_MONEY_SYMBOL, DISCORD_MONEY_NAME
@@ -163,6 +167,10 @@ class Economy(BaseCog):
                 return
             source.value -= args.amount
             Balance.update(value=Balance.value - args.amount).where(Balance.id == source.id).execute()
+        # Decrease currency rate
+        if currency.user:
+            currency.rate = max(DISCORD_MONEY_MINI, currency.rate * DISCORD_MONEY_RATE)
+            Currency.update(rate=currency.rate).where(Currency.id == currency.id).execute()
         # Give money
         balance = self.get_balance(target, currency)
         balance.value += args.amount
@@ -232,7 +240,54 @@ class Economy(BaseCog):
     async def _create(self, ctx, *args):
         """
         Permet de créer une nouvelle devise.
-        Usage : `!create <symbole> "<nom>"`
+        Usage : `!create <symbole> "<nom>" [<montant>]`
+        """
+        if ctx.channel and hasattr(ctx.channel, 'name'):
+            await ctx.message.delete()
+        user = await self.get_user(ctx.author)
+        # Argument parser
+        parser = Parser(
+            prog=f'{ctx.prefix}{ctx.command.name}',
+            description="Permet de créer une nouvelle devise.")
+        parser.add_argument('symbol', type=str, help="Symbole de la devise")
+        parser.add_argument('name', type=str, help="Nom de la devise")
+        parser.add_argument('amount', type=int, nargs='?', help="Investissement initial")
+        args = parser.parse_args(args)
+        if parser.message:
+            await ctx.author.send(f"```{parser.message}```")
+            return
+        # Update balance
+        if args.amount and args.amount < DISCORD_MONEY_CREATE:
+            await ctx.author.send(
+                f":no_entry:  Vous devez investir au minimum **{DISCORD_MONEY_CREATE:n} {DISCORD_MONEY_SYMBOL}** "
+                f"lors de la création de votre nouvelle devise.")
+            return
+        value = args.amount or DISCORD_MONEY_CREATE
+        # Check balance
+        base_currency = self.get_currency(DISCORD_MONEY_SYMBOL)
+        balance = self.get_balance(user, base_currency)
+        if balance.value < value:
+            await ctx.author.send(
+                f":no_entry:  Vous n'avez pas assez d'argent sur votre compte "
+                f"(actuellement **{round(balance.value, 2):n} {base_currency.symbol}**)")
+            return
+        balance.value -= value
+        Balance.update(value=Balance.value - value).where(Balance.id == balance.id).execute()
+        # Try create currency
+        currency = self.get_currency(args.symbol, create=True, name=args.name, user=user, value=value)
+        if currency.user != user:
+            await ctx.author.send(f":no_entry:  Cette devise ne vous appartient pas.")
+            return
+        await ctx.author.send(
+            f":white_check_mark:  Votre nouvelle devise **{args.name}** ({args.symbol}) a été créée avec succès !\n"
+            f"Vous pouvez désormais en distribuer autant que vous le voulez avec `{ctx.prefix}give`, lui donner de la "
+            f"valeur en l'approvisionnant avec `{ctx.prefix}store` et consulter son cours avec `{ctx.prefix}rate`.")
+
+    @commands.command(name='rename')
+    async def _rename(self, ctx, *args):
+        """
+        Permet de renommer une devise existante.
+        Usage : `!rename <symbole> "<nom>"`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -247,19 +302,17 @@ class Economy(BaseCog):
         if parser.message:
             await ctx.author.send(f"```{parser.message}```")
             return
-        # Try create currency
-        currency = self.get_currency(args.symbol, create=True, name=args.name, user=user)
+        # Check currency
+        currency = self.get_currency(args.symbol)
         if currency.user != user:
-            await ctx.author.send(f":no_entry:  Cette devise ne vous appartient pas ou existe déjà.")
+            await ctx.author.send(f":no_entry:  Cette devise ne vous appartient pas.")
             return
         # Change name if needed
         if currency.name != args.name:
             currency.name = args.name
             currency.save(only=('name', ))
         await ctx.author.send(
-            f":white_check_mark:  Votre nouvelle devise **{args.name}** ({args.symbol}) a été créée avec succès !\n"
-            f"Vous pouvez désormais en distribuer autant que vous le voulez avec `{ctx.prefix}give`, lui donner de la "
-            f"valeur en l'approvisionnant avec `{ctx.prefix}store` et consulter son cours avec `{ctx.prefix}rate`.")
+            f":white_check_mark:  Vous avez renommé votre devise **{currency.name}** ({currency.symbol}) avec succès !")
 
     @commands.command(name='delete')
     async def _delete(self, ctx, *args):
@@ -332,6 +385,7 @@ class Economy(BaseCog):
             f"Nombre en circulation : **{round(total,2):n}**"]
         if currency != base:
             messages.extend([
+                f"Taux actuel : **{round(currency.rate, 2):.02%}**",
                 f"Valeur totale : **{round(currency.value,2):n} {base.symbol}**",
                 f"Valeur individuelle : **{round(rate,2):n} {base.symbol}**"])
         messages.append(f"Classement des 10 plus grosses fortunes en **{currency.name}** :")
@@ -434,12 +488,12 @@ class Economy(BaseCog):
                     messages.append(
                         f"> **{currency.name}** ({currency.symbol}) avec "
                         f"**{round(total, 2):n}** unités en circulation d'une valeur de "
-                        f"**{round(value, 2):n} {base.symbol}**")
+                        f"**{round(value, 2):n} {base.symbol}** (taux: {round(base.rate,2):.2%})")
                 else:
                     messages.append(
                         f"> **{currency.name}** ({currency.symbol}) créée par **{currency.user.name}** avec "
                         f"**{round(total,2):n}** unités en circulation d'une valeur de "
-                        f"**{round(value,2):n} {base.symbol}**")
+                        f"**{round(value,2):n} {base.symbol}** (taux: {round(base.rate,2):.2%})")
             else:
                 messages.append(
                     f"> **{currency.name}** ({currency.symbol}) devise principale avec "
@@ -503,8 +557,12 @@ class Economy(BaseCog):
         Balance.update(value=Balance.value - args.amount).where(Balance.id == balance.id).execute()
         base_balance.value += value
         Balance.update(value=Balance.value + value).where(Balance.id == base_balance.id).execute()
-        currency.value -= value
-        Currency.update(value=Currency.value - value).where(Currency.id == currency.id).execute()
+        currency.value -= args.amount
+        currency.rate += args.amount / total
+        Currency.update(
+            value=Currency.value - args.amount,
+            rate=Currency.rate + (args.amount / total)
+        ).where(Currency.id == currency.id).execute()
         await ctx.author.send(
             f":moneybag:  Vous avez vendu **{args.amount:n} {currency.symbol}** ({currency.name})"
             f"pour une valeur de **{round(value,2):n} {base.symbol}** ({base.name}) !")
@@ -513,7 +571,7 @@ class Economy(BaseCog):
     async def _slot(self, ctx, *args):
         """
         Joue une quantité d'argent à la machine à sous.
-        Usage : `!slot <montant>`
+        Usage : `!slot <montant> [<symbole>]`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -522,7 +580,8 @@ class Economy(BaseCog):
         parser = Parser(
             prog=f'{ctx.prefix}{ctx.command.name}',
             description="Joue une quantité d'argent à la machine à sous.")
-        parser.add_argument('amount', type=int, help=f"Quantité de {DISCORD_MONEY_NAME}")
+        parser.add_argument('amount', type=int, help="Quantité d'argent")
+        parser.add_argument('symbol', type=str, nargs='?', help="Symbole de la devise")
         args = parser.parse_args(args)
         if parser.message:
             await ctx.author.send(f"```{parser.message}```")
@@ -531,8 +590,15 @@ class Economy(BaseCog):
         if not args.amount > 0:
             await ctx.author.send(f":no_entry:  La quantité ne peut être négative ou nulle.")
             return
+        # Check currency
+        currency = self.get_currency(args.symbol or DISCORD_MONEY_SYMBOL)
+        if not currency:
+            await ctx.author.send(f":no_entry:  La devise sélectionnée n'existe pas.")
+            return
+        if currency.user == user:
+            await ctx.author.send(f":no_entry:  Cette devise vous appartient, vous ne pouvez pas la jouer.")
+            return
         # Check balance
-        currency = self.get_currency(DISCORD_MONEY_SYMBOL)
         balance = self.get_balance(user, currency)
         if balance.value < args.amount:
             await ctx.author.send(
@@ -563,6 +629,13 @@ class Economy(BaseCog):
         if result:
             balance.value += result
             Balance.update(value=Balance.value + result).where(Balance.id == balance.id).execute()
+        # Add loss to loto
+        if not result:
+            value = args.amount
+            if currency.symbol != DISCORD_MONEY_SYMBOL:
+                total = Balance.select(pw.fn.SUM(Balance.value)).where(Balance.currency == currency).scalar() or 0.0
+                value = round(args.amount * (currency.value * currency.rate / (total or 1)), 5)
+            LotoDraw.update(value=LotoDraw.value + value).where(LotoDraw.date == date.today()).execute()
         # Create display message
         slot1, slot2, slot3 = sorted(results, reverse=True)
         messages = ["C'est parti !", f"{slots[slot1]}", f"{slots[slot2]}", f"{slots[slot3]}"]
@@ -665,8 +738,30 @@ class Economy(BaseCog):
         """
         if (user.id, currency.symbol) not in self.balances:
             self.balances[user.id, currency.symbol], created = Balance.get_or_create(
-                user=user, currency=currency)
+                user=user, currency=currency, defaults=dict(
+                    value=DISCORD_MONEY_START if currency.symbol == DISCORD_MONEY_SYMBOL else 0.0))
         return self.balances.get((user.id, currency.symbol))
+
+    @commands.command(name='seed')
+    @commands.has_role(DISCORD_ADMIN)
+    async def _seed(self, ctx, *args):
+        """
+        Modifie la graine du générateur de nombres pseudo-aléatoire (admin uniquement).
+        Usage : `!seed <nombre>`
+        """
+        if ctx.channel and hasattr(ctx.channel, 'name'):
+            await ctx.message.delete()
+        user = await self.get_user(ctx.author)
+        # Argument parser
+        parser = Parser(
+            prog=f'{ctx.prefix}{ctx.command.name}',
+            description="Permet de modifier la graine du générateur de nombres pseudo-aléatoire.")
+        parser.add_argument('seed', type=int, help="Seed")
+        args = parser.parse_args(args)
+        if parser.message:
+            await ctx.author.send(f"```{parser.message}```")
+            return
+        seed(args.seed)
 
     @commands.command(name='draw')
     @commands.has_role(DISCORD_ADMIN)
@@ -717,7 +812,7 @@ class Economy(BaseCog):
             ).execute()
         LotoGrid.update(rank=0, gain=0).where(LotoGrid.date == draw_date, LotoGrid.rank.is_null()).execute()
         # Save draw and create new draw
-        loto.save(only=('draw',))
+        loto.save(only=('draw', ))
         extra_value = 0.0 if ranks[DISCORD_LOTO_COUNT] else DISCORD_LOTO_EXTRA
         new_value = max(total_gain - given_gain + extra_value, DISCORD_LOTO_START)
         loto, created = LotoDraw.get_or_create(
@@ -732,12 +827,12 @@ class Economy(BaseCog):
         nb_winners = len(set.union(*map(set, winners_by_rank.values()))) if winners_by_rank else 0
         messages = [
             f":game_die: Bonjour à tous, voici les résultats LOTO du **{draw_date:%A %d %B %Y}** :",
-            f"La cagnotte totale était de **{round(total_gain, 2):n} {currency.symbol}**.",
+            f"La cagnotte totale était de **{round(total_gain,2):n} {currency.symbol}**.",
             f"Tirage : **{draw}**"]
         if nb_winners:
             messages.append(
                 f"Félicitations à nos **{nb_winners} gagnant(s)** qui se partagent "
-                f"**{round(given_gain, 2):n} {currency.symbol}** :")
+                f"**{round(given_gain,2):n} {currency.symbol}** :")
             for rank, winners in winners_by_rank.items():
                 if not winners:
                     continue
@@ -754,7 +849,7 @@ class Economy(BaseCog):
         await channel.send('\n'.join(messages))
 
     @tasks.loop(hours=1)
-    async def _paid_wage(self):
+    async def _pay_wage(self):
         """
         Event loop to add the hourly wage to all balances
         """
@@ -765,8 +860,20 @@ class Economy(BaseCog):
             Balance.date <= current_date - timedelta(hours=1), Balance.currency << currency
         ).execute()
         # Clear cache
-        self.currencies.clear()
         self.balances.clear()
+
+    @tasks.loop(hours=1)
+    async def _rate_money(self):
+        """
+        Event loop to random rate the custom currencies
+        """
+        for currency in Currency.select():
+            mini, maxi = int(-currency.rate * 10), int((2.0 - currency.rate) * 10)
+            currency.rate += randint(mini, maxi) / 100.0
+            currency.rate = round(max(currency.rate, DISCORD_MONEY_MINI), 2)
+            currency.save(only=('rate', ))
+        # Clear cache
+        self.currencies.clear()
 
     @tasks.loop(hours=1)
     async def _draw_loto(self):
