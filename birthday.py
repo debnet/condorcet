@@ -82,8 +82,8 @@ class HappyBirthday(BaseCog):
             else:
                 age = int((today - birthday.birth_date).days / 365)
                 birthdays.append(f"<@{birthday.user.id}> ({age} ans)")
-                birthday.last_check = today
-                birthday.save(only=('last_check', ))
+            birthday.last_check = today
+            birthday.save(only=('last_check', ))
         if birthdays:
             await channel.send(
                 f":birthday:  Nous fêtons **{len(birthdays)}** anniversaire(s) aujourd'hui ! "

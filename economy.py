@@ -564,14 +564,14 @@ class Economy(BaseCog):
             rate=Currency.rate + (args.amount / total)
         ).where(Currency.id == currency.id).execute()
         await ctx.author.send(
-            f":moneybag:  Vous avez vendu **{args.amount:n} {currency.symbol}** ({currency.name})"
+            f":moneybag:  Vous avez vendu **{args.amount:n} {currency.symbol}** ({currency.name}) "
             f"pour une valeur de **{round(value,2):n} {base.symbol}** ({base.name}) !")
 
     @commands.command(name='slot')
     async def _slot(self, ctx, *args):
         """
         Joue une quantité d'argent à la machine à sous.
-        Usage : `!slot <montant> [<symbole>]`
+        Usage : `!slot <montant>`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -697,7 +697,7 @@ class Economy(BaseCog):
         # Check balance
         currency = self.get_currency(DISCORD_MONEY_SYMBOL)
         balance = self.get_balance(user, currency)
-        price = max(int(loto.value / DISCORD_LOTO_LIMIT) * DISCORD_LOTO_PRICE, DISCORD_LOTO_PRICE)
+        price = round(DISCORD_LOTO_PRICE + max(0, (loto.value - DISCORD_LOTO_START) / DISCORD_LOTO_LIMIT), 1)
         if balance.value < price:
             await ctx.author.send(
                 f":no_entry:  Vous n'avez pas assez d'argent sur votre compte : une grille coûte "
@@ -705,6 +705,7 @@ class Economy(BaseCog):
                 f"**{round(balance.value,2):n} {currency.symbol}**).")
             return
         # Pay and create grid
+        balance.value -= price
         Balance.update(value=Balance.value - price).where(Balance.id == balance.id).execute()
         grid = LotoGrid.create(user=user, draw=' '.join(map(str, numbers)))
         # Display information
@@ -789,7 +790,7 @@ class Economy(BaseCog):
             grid_draw = set(map(int, grid.draw.split()))
             ranks[len(loto_draw & grid_draw)].append(grid)
         # Total to gain
-        old_price = max(int(loto.value / DISCORD_LOTO_LIMIT) * DISCORD_LOTO_PRICE, DISCORD_LOTO_PRICE)
+        old_price = round(DISCORD_LOTO_PRICE + max(0, (loto.value - DISCORD_LOTO_START) / DISCORD_LOTO_LIMIT), 1)
         total_gain = loto.value + LotoGrid.select().where(
             LotoGrid.date == draw_date, LotoGrid.gain.is_null()
         ).count() * old_price
@@ -811,6 +812,8 @@ class Economy(BaseCog):
                 Balance.currency == currency, Balance.user_id << [g.user_id for g in grids]
             ).execute()
         LotoGrid.update(rank=0, gain=0).where(LotoGrid.date == draw_date, LotoGrid.rank.is_null()).execute()
+        self.currencies.clear()
+        self.balances.clear()
         # Save draw and create new draw
         loto.save(only=('draw', ))
         extra_value = 0.0 if ranks[DISCORD_LOTO_COUNT] else DISCORD_LOTO_EXTRA
@@ -818,7 +821,7 @@ class Economy(BaseCog):
         loto, created = LotoDraw.get_or_create(
             date=date.today() + timedelta(days=1) if ctx else date.today(),
             defaults=dict(value=new_value))
-        new_price = max(int(loto.value / DISCORD_LOTO_LIMIT) * DISCORD_LOTO_PRICE, DISCORD_LOTO_PRICE)
+        new_price = round(DISCORD_LOTO_PRICE + max(0, (loto.value - DISCORD_LOTO_START) / DISCORD_LOTO_LIMIT), 1)
         # Display results
         draw = ' - '.join(f"{d:02}" for d in sorted(loto_draw))
         for i in range(10):
