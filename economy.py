@@ -873,7 +873,7 @@ class Economy(BaseCog):
         """
         Event loop to random rate the custom currencies
         """
-        for currency in Currency.select():
+        for currency in Currency.select().where(Currency.symbol != DISCORD_MONEY_SYMBOL):
             mini, maxi = int(-currency.rate * 10), int((2.0 - currency.rate) * 10)
             currency.rate += randint(mini, maxi) / 100.0
             currency.rate = round(max(currency.rate, DISCORD_MONEY_MINI), 2)
