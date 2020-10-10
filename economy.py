@@ -491,12 +491,12 @@ class Economy(BaseCog):
                     messages.append(
                         f"> **{currency.name}** ({currency.symbol}) avec "
                         f"**{round(total, 2):n}** unités en circulation d'une valeur de "
-                        f"**{round(value, 2):n} {base.symbol}** (taux: {round(base.rate,2):.2%})")
+                        f"**{round(value, 2):n} {base.symbol}** (taux: {round(currency.rate,2):.2%})")
                 else:
                     messages.append(
                         f"> **{currency.name}** ({currency.symbol}) créée par **{currency.user.name}** avec "
                         f"**{round(total,2):n}** unités en circulation d'une valeur de "
-                        f"**{round(value,2):n} {base.symbol}** (taux: {round(base.rate,2):.2%})")
+                        f"**{round(value,2):n} {base.symbol}** (taux: {round(currency.rate,2):.2%})")
             else:
                 messages.append(
                     f"> **{currency.name}** ({currency.symbol}) devise principale avec "
