@@ -13,7 +13,7 @@ from base import DISCORD_ADMIN, BaseCog, Parser, User, database
 # Discord economy constants
 DISCORD_MONEY_SYMBOL = os.environ.get('DISCORD_MONEY_SYMBOL') or '$'
 DISCORD_MONEY_NAME = os.environ.get('DISCORD_MONEY_NAME') or 'dollar'
-DISCORD_MONEY_START = float(os.environ.get('DISCORD_MONEY_START') or 100.0)
+DISCORD_MONEY_START = float(os.environ.get('DISCORD_MONEY_START') or 5.0)
 DISCORD_MONEY_MULT = float(os.environ.get('DISCORD_MONEY_MULT') or 0.01)
 DISCORD_MONEY_MINI = float(os.environ.get('DISCORD_MONEY_MINI') or 0.1)
 DISCORD_MONEY_RATE = float(os.environ.get('DISCORD_MONEY_RATE') or 0.99)
@@ -24,7 +24,7 @@ DISCORD_LOTO_CHANNEL = os.environ.get('DISCORD_LOTO_CHANNEL') or 'loto'
 DISCORD_LOTO_PRICE = float(os.environ.get('DISCORD_LOTO_PRICE') or 1.0)
 DISCORD_LOTO_LIMIT = float(os.environ.get('DISCORD_LOTO_LIMIT') or 100.0)
 DISCORD_LOTO_COUNT = int(os.environ.get('DISCORD_LOTO_COUNT') or 6)
-DISCORD_LOTO_START = float(os.environ.get('DISCORD_LOTO_START') or 5.0)
+DISCORD_LOTO_START = float(os.environ.get('DISCORD_LOTO_START') or 100.0)
 DISCORD_LOTO_EXTRA = float(os.environ.get('DISCORD_LOTO_EXTRA') or 10.0)
 
 
