@@ -14,7 +14,7 @@ from base import DISCORD_ADMIN, BaseCog, Parser, User, database
 DISCORD_MONEY_SYMBOL = os.environ.get('DISCORD_MONEY_SYMBOL') or '$'
 DISCORD_MONEY_NAME = os.environ.get('DISCORD_MONEY_NAME') or 'dollar'
 DISCORD_MONEY_START = float(os.environ.get('DISCORD_MONEY_START') or 5.0)
-DISCORD_MONEY_MULT = float(os.environ.get('DISCORD_MONEY_MULT') or 0.01)
+DISCORD_MONEY_MULT = float(os.environ.get('DISCORD_MONEY_MULT') or 0.001)
 DISCORD_MONEY_MINI = float(os.environ.get('DISCORD_MONEY_MINI') or 0.1)
 DISCORD_MONEY_RATE = float(os.environ.get('DISCORD_MONEY_RATE') or 0.99)
 DISCORD_MONEY_WAGE = float(os.environ.get('DISCORD_MONEY_WAGE') or 0.1)
