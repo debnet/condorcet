@@ -23,7 +23,7 @@ DISCORD_MONEY_CREATE = float(os.environ.get('DISCORD_MONEY_CREATE') or 10.0)
 DISCORD_LOTO_CHANNEL = os.environ.get('DISCORD_LOTO_CHANNEL') or 'loto'
 DISCORD_LOTO_PRICE = float(os.environ.get('DISCORD_LOTO_PRICE') or 1.0)
 DISCORD_LOTO_LIMIT = float(os.environ.get('DISCORD_LOTO_LIMIT') or 100.0)
-DISCORD_LOTO_COUNT = int(os.environ.get('DISCORD_LOTO_COUNT') or 6)
+DISCORD_LOTO_COUNT = int(os.environ.get('DISCORD_LOTO_COUNT') or 5)
 DISCORD_LOTO_START = float(os.environ.get('DISCORD_LOTO_START') or 100.0)
 DISCORD_LOTO_EXTRA = float(os.environ.get('DISCORD_LOTO_EXTRA') or 10.0)
 
@@ -811,9 +811,10 @@ class Economy(BaseCog):
             gains[rank] = gain = (total_gain * rate) / len(grids)
             given_gain += gain * len(grids)
             LotoGrid.update(rank=rank, gain=gain).where(LotoGrid.id << [g.id for g in grids]).execute()
-            Balance.update(value=Balance.value + gain).where(
-                Balance.currency == currency, Balance.user_id << [g.user_id for g in grids]
-            ).execute()
+            for grid in grids:
+                Balance.update(value=Balance.value + gain).where(
+                    Balance.currency == currency, Balance.user_id == grid.user_id
+                ).execute()
         LotoGrid.update(rank=0, gain=0).where(LotoGrid.date == draw_date, LotoGrid.rank.is_null()).execute()
         self.currencies.clear()
         self.balances.clear()
