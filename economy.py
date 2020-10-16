@@ -22,7 +22,7 @@ DISCORD_MONEY_LIMIT = float(os.environ.get('DISCORD_MONEY_LIMIT') or 1000)
 DISCORD_MONEY_CREATE = float(os.environ.get('DISCORD_MONEY_CREATE') or 10.0)
 DISCORD_LOTO_CHANNEL = os.environ.get('DISCORD_LOTO_CHANNEL') or 'loto'
 DISCORD_LOTO_PRICE = float(os.environ.get('DISCORD_LOTO_PRICE') or 1.0)
-DISCORD_LOTO_LIMIT = float(os.environ.get('DISCORD_LOTO_LIMIT') or 100.0)
+DISCORD_LOTO_LIMIT = float(os.environ.get('DISCORD_LOTO_LIMIT') or 1000.0)
 DISCORD_LOTO_COUNT = int(os.environ.get('DISCORD_LOTO_COUNT') or 5)
 DISCORD_LOTO_START = float(os.environ.get('DISCORD_LOTO_START') or 100.0)
 DISCORD_LOTO_EXTRA = float(os.environ.get('DISCORD_LOTO_EXTRA') or 10.0)
@@ -700,7 +700,7 @@ class Economy(BaseCog):
         # Check balance
         currency = self.get_currency(DISCORD_MONEY_SYMBOL)
         balance = self.get_balance(user, currency)
-        price = round(DISCORD_LOTO_PRICE + max(0, (loto.value - DISCORD_LOTO_START) / DISCORD_LOTO_LIMIT), 1)
+        price = round(DISCORD_LOTO_PRICE + round(loto.value / DISCORD_LOTO_LIMIT, 1), 1)
         if balance.value < price:
             await ctx.author.send(
                 f":no_entry:  Vous n'avez pas assez d'argent sur votre compte : une grille coûte "
@@ -793,7 +793,7 @@ class Economy(BaseCog):
             grid_draw = set(map(int, grid.draw.split()))
             ranks[len(loto_draw & grid_draw)].append(grid)
         # Total to gain
-        old_price = round(DISCORD_LOTO_PRICE + max(0, (loto.value - DISCORD_LOTO_START) / DISCORD_LOTO_LIMIT), 1)
+        old_price = round(DISCORD_LOTO_PRICE + round(loto.value / DISCORD_LOTO_LIMIT, 1), 1)
         total_gain = loto.value + LotoGrid.select().where(
             LotoGrid.date == draw_date, LotoGrid.gain.is_null()
         ).count() * old_price
@@ -825,7 +825,7 @@ class Economy(BaseCog):
         loto, created = LotoDraw.get_or_create(
             date=date.today() + timedelta(days=1) if ctx else date.today(),
             defaults=dict(value=new_value))
-        new_price = round(DISCORD_LOTO_PRICE + max(0, (loto.value - DISCORD_LOTO_START) / DISCORD_LOTO_LIMIT), 1)
+        new_price = round(DISCORD_LOTO_PRICE + round(loto.value / DISCORD_LOTO_START, 1), 1)
         # Display results
         draw = ' - '.join(f"{d:02}" for d in sorted(loto_draw))
         for i in range(10):
