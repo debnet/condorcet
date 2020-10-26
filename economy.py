@@ -630,7 +630,7 @@ class Economy(BaseCog):
         base_balance.value -= value
         Balance.update(value=Balance.value - value).where(Balance.id == base_balance.id).execute()
         balance = self.get_balance(user, currency)
-        balance += args.amount
+        balance.value += args.amount
         Balance.update(value=Balance.value + args.amount).where(Balance.id == balance.id).execute()
         # Update currency
         currency.value += value
