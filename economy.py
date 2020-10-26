@@ -96,6 +96,7 @@ class Economy(BaseCog):
         self.currencies = {}
         self.balances = {}
         self.messages = {}
+        self.seeds = []
         self._pay_wage.start()
         self._rate_money.start()
         self._draw_loto.start()
@@ -165,8 +166,9 @@ class Economy(BaseCog):
             source = self.get_balance(user, currency)
             if source.value < args.amount:
                 await ctx.author.send(
-                    f":no_entry:  Vous n'avez pas assez d'argent sur votre compte "
-                    f"(actuellement **{source.value:n} {currency.symbol}**)")
+                    f":no_entry:  Vous n'avez pas assez d'argent sur votre compte : vous avez actuellement "
+                    f"**{round(source.value, 2):n} {currency.symbol}** "
+                    f"et il vous faut **{round(args.amount, 2):n} {currency.symbol}**.")
                 return
             source.value -= args.amount
             Balance.update(value=Balance.value - args.amount).where(Balance.id == source.id).execute()
@@ -227,8 +229,9 @@ class Economy(BaseCog):
         balance = self.get_balance(user, base)
         if balance.value < args.amount:
             await ctx.author.send(
-                f":no_entry:  Vous n'avez pas assez d'argent sur votre compte "
-                f"(actuellement **{round(balance.value,2):n} {base.symbol}**)")
+                f":no_entry:  Vous n'avez pas assez d'argent sur votre compte : vous avez actuellement "
+                f"**{round(balance.value,2):n} {currency.symbol}** "
+                f"et il vous faut **{round(args.amount,2):n} {currency.symbol}**.")
             return
         # Transfert money
         balance.value -= args.amount
@@ -271,8 +274,9 @@ class Economy(BaseCog):
         balance = self.get_balance(user, base_currency)
         if balance.value < value:
             await ctx.author.send(
-                f":no_entry:  Vous n'avez pas assez d'argent sur votre compte "
-                f"(actuellement **{round(balance.value, 2):n} {base_currency.symbol}**)")
+                f":no_entry:  Vous n'avez pas assez d'argent sur votre compte : vous avez actuellement "
+                f"**{round(balance.value,2):n} {base_currency.symbol}** "
+                f"et il vous faut **{round(value,2):n} {base_currency.symbol}**.")
             return
         balance.value -= value
         Balance.update(value=Balance.value - value).where(Balance.id == balance.id).execute()
@@ -388,12 +392,12 @@ class Economy(BaseCog):
             f"Nombre en circulation : **{round(total,2):n}**"]
         if currency != base:
             messages.extend([
-                f"Taux actuel : **{round(currency.rate, 2):.02%}**",
+                f"Taux actuel : **{round(currency.rate, 2):.0%}**",
                 f"Valeur totale : **{round(currency.value,2):n} {base.symbol}**",
                 f"Valeur individuelle : **{round(rate,2):n} {base.symbol}**"])
         messages.append(f"Classement des 10 plus grosses fortunes en **{currency.name}** :")
         balances = Balance.select(Balance, User).join(User).where(
-            Balance.currency == currency
+            Balance.currency == currency, Balance.value > 0.001
         ).order_by(Balance.value.desc()).limit(10)
         for indice, balance in zip(self.RANKS, balances):
             indice = self.get_icon(indice)
@@ -491,12 +495,12 @@ class Economy(BaseCog):
                     messages.append(
                         f"> **{currency.name}** ({currency.symbol}) avec "
                         f"**{round(total, 2):n}** unités en circulation d'une valeur de "
-                        f"**{round(value, 2):n} {base.symbol}** (taux: {round(currency.rate,2):.2%})")
+                        f"**{round(value, 2):n} {base.symbol}** (taux: {round(currency.rate,2):.0%})")
                 else:
                     messages.append(
                         f"> **{currency.name}** ({currency.symbol}) créée par **{currency.user.name}** avec "
                         f"**{round(total,2):n}** unités en circulation d'une valeur de "
-                        f"**{round(value,2):n} {base.symbol}** (taux: {round(currency.rate,2):.2%})")
+                        f"**{round(value,2):n} {base.symbol}** (taux: {round(currency.rate,2):.0%})")
             else:
                 messages.append(
                     f"> **{currency.name}** ({currency.symbol}) devise principale avec "
@@ -536,45 +540,116 @@ class Economy(BaseCog):
             await ctx.author.send(f":no_entry:  La quantité ne peut être négative ou nulle.")
             return
         # Check currency
-        base = self.get_currency(DISCORD_MONEY_SYMBOL)
+        base_currency = self.get_currency(DISCORD_MONEY_SYMBOL)
         currency = self.get_currency(args.symbol)
         if not currency:
             await ctx.author.send(f":no_entry:  La devise sélectionnée n'existe pas.")
             return
-        if currency == base:
-            await ctx.author.send(f":no_entry:  La devise principale (**{base.name}**) ne peut être vendue.")
+        if currency == base_currency:
+            await ctx.author.send(f":no_entry:  La devise principale (**{base_currency.name}**) ne peut être vendue.")
             return
         # Check balance
         balance = self.get_balance(user, currency)
         if balance.value < args.amount:
             await ctx.author.send(
-                f":no_entry:  Vous n'avez pas assez d'argent sur votre compte "
-                f"(actuellement **{round(balance.value,2):n} {currency.symbol}**)")
+                f":no_entry:  Vous n'avez pas assez d'argent sur votre compte : vous avez actuellement "
+                f"**{round(balance.value,2):n} {currency.symbol}** "
+                f"et il vous faut **{round(args.amount,2):n} {currency.symbol}**.")
             return
         # Get currency rate
-        base_balance = self.get_balance(user, base)
         total = Balance.select(pw.fn.SUM(Balance.value)).where(Balance.currency == currency).scalar() or 0.0
         value = round(args.amount * (currency.value * currency.rate / (total or 1)), 5)
-        # Update
+        rate = round(args.amount / (total - args.amount), 2) if total - args.amount else 0.0
+        rate = max(0.0, min(rate, 2.0 - currency.rate))
+        # Update balance
         balance.value -= args.amount
         Balance.update(value=Balance.value - args.amount).where(Balance.id == balance.id).execute()
+        base_balance = self.get_balance(user, base_currency)
         base_balance.value += value
         Balance.update(value=Balance.value + value).where(Balance.id == base_balance.id).execute()
-        currency.value -= args.amount
-        currency.rate += args.amount / total
+        # Update currency
+        currency.value -= value
+        currency.rate += rate
         Currency.update(
-            value=Currency.value - args.amount,
-            rate=Currency.rate + (args.amount / total)
+            value=Currency.value - value,
+            rate=Currency.rate + rate
         ).where(Currency.id == currency.id).execute()
+        # Message to user
         await ctx.author.send(
             f":moneybag:  Vous avez vendu **{args.amount:n} {currency.symbol}** ({currency.name}) "
-            f"pour une valeur de **{round(value,2):n} {base.symbol}** ({base.name}) !")
+            f"pour une valeur de **{round(value,2):n} {base_currency.symbol}** ({base_currency.name}) !")
+
+    @commands.command(name='buy')
+    async def _buy(self, ctx, *args):
+        """
+        Permet d'acheter une quantité d'une devise quelconque au taux actuel
+        Usage : `!buy <nombre> <symbol>`
+        """
+        if ctx.channel and hasattr(ctx.channel, 'name'):
+            await ctx.message.delete()
+        user = await self.get_user(ctx.author)
+        # Argument parser
+        parser = Parser(
+            prog=f'{ctx.prefix}{ctx.command.name}',
+            description="Joue une quantité d'argent à la machine à sous.")
+        parser.add_argument('amount', type=int, help="Quantité d'argent")
+        parser.add_argument('symbol', type=str, help="Symbole de la devise")
+        args = parser.parse_args(args)
+        if parser.message:
+            await ctx.author.send(f"```{parser.message}```")
+            return
+        # Check positive
+        if not args.amount > 0:
+            await ctx.author.send(f":no_entry:  La quantité ne peut être négative ou nulle.")
+            return
+        # Check currency
+        base_currency = self.get_currency(DISCORD_MONEY_SYMBOL)
+        currency = self.get_currency(args.symbol)
+        if not currency:
+            await ctx.author.send(f":no_entry:  La devise sélectionnée n'existe pas.")
+            return
+        if currency.user == user:
+            await ctx.author.send(f":no_entry:  Cette devise vous appartient, vous ne pouvez pas en acheter.")
+            return
+        if not currency.user:
+            await ctx.author.send(f":no_entry:  La devise principale (**{base_currency.name}**) ne peut être achetée.")
+        # Get currency rate
+        total = Balance.select(pw.fn.SUM(Balance.value)).where(Balance.currency == currency).scalar() or 0.0
+        value = round(args.amount * (currency.value * currency.rate / (total or 1)), 5)
+        rate = round(args.amount / (total + args.amount), 2) if total + args.amount else 0.0
+        rate = max(0.0, min(rate, currency.rate))
+        # Check balance
+        base_balance = self.get_balance(user, base_currency)
+        if base_balance.value < value:
+            await ctx.author.send(
+                f":no_entry:  Vous n'avez pas assez d'argent sur votre compte : vous avez actuellement "
+                f"**{round(base_balance.value,2):n} {currency.symbol}** "
+                f"et il vous faut **{round(value,2):n} {currency.symbol}**.")
+            return
+        # Update balance
+        base_balance -= value
+        Balance.update(value=Balance.value - value).where(Balance.id == base_balance.id).execute()
+        balance = self.get_balance(user, currency)
+        balance += args.amount
+        Balance.update(value=Balance.value + args.amount).where(Balance.id == balance.id).execute()
+        # Update currency
+        currency.value += value
+        currency.rate -= rate
+        Currency.update(
+            value=Currency.value + value,
+            rate=Currency.rate - rate,
+        ).where(Currency.id == currency.id).execute()
+        # Message to user
+        # Message to user
+        await ctx.author.send(
+            f":moneybag:  Vous avez acheté **{args.amount:n} {currency.symbol}** ({currency.name}) "
+            f"pour une valeur de **{round(value,2):n} {base_currency.symbol}** ({base_currency.name}) !")
 
     @commands.command(name='slot')
     async def _slot(self, ctx, *args):
         """
         Joue une quantité d'argent à la machine à sous.
-        Usage : `!slot <montant>`
+        Usage : `!slot <montant> [<symbole>]`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -605,8 +680,9 @@ class Economy(BaseCog):
         balance = self.get_balance(user, currency)
         if balance.value < args.amount:
             await ctx.author.send(
-                f":no_entry:  Vous n'avez pas assez d'argent sur votre compte "
-                f"(actuellement **{round(balance.value,2):n} {currency.symbol}**)")
+                f":no_entry:  Vous n'avez pas assez d'argent sur votre compte : vous avez actuellement "
+                f"**{round(balance.value,2):n} {currency.symbol}** "
+                f"et il vous faut **{round(args.amount,2):n} {currency.symbol}**.")
             return
         # Place the bet
         balance.value -= args.amount
@@ -627,6 +703,7 @@ class Economy(BaseCog):
             (5, 5, 5): 10.0,
             (6, 6, 6): 15.0}
         values = list(slots.keys())
+        seed(self.seeds.pop(0) if self.seeds else None)
         results = choice(values), choice(values), choice(values)
         result = args.amount * multipliers.get(results, 1.0 if len(set(results)) < len(results) else 0.0)
         if result:
@@ -751,7 +828,7 @@ class Economy(BaseCog):
     async def _seed(self, ctx, *args):
         """
         Modifie la graine du générateur de nombres pseudo-aléatoire (admin uniquement).
-        Usage : `!seed <nombre>`
+        Usage : `!seed [<nombre>]`
         """
         if ctx.channel and hasattr(ctx.channel, 'name'):
             await ctx.message.delete()
@@ -760,12 +837,17 @@ class Economy(BaseCog):
         parser = Parser(
             prog=f'{ctx.prefix}{ctx.command.name}',
             description="Permet de modifier la graine du générateur de nombres pseudo-aléatoire.")
-        parser.add_argument('seed', type=int, help="Seed")
+        parser.add_argument('seed', type=int, nargs='?', help="Seed")
         args = parser.parse_args(args)
         if parser.message:
             await ctx.author.send(f"```{parser.message}```")
             return
-        seed(args.seed)
+        if args.seed:
+            self.seeds.append(args.seed)
+        else:
+            self.seeds.clear()
+        seeds = ', '.join(map(str, self.seeds))
+        await ctx.author.send(f":game_die:  Graine(s) configurée(s) : **{seeds or 'aucune'}**")
 
     @commands.command(name='draw')
     @commands.has_role(DISCORD_ADMIN)
@@ -785,6 +867,7 @@ class Economy(BaseCog):
         loto = LotoDraw.select().where(LotoDraw.date == draw_date, LotoDraw.draw.is_null()).first()
         if not loto:
             return
+        seed(self.seeds.pop(0) if self.seeds else None)
         loto_draw = set(sample(list(range(1, 50)), k=DISCORD_LOTO_COUNT))
         loto.draw = ' '.join(map(str, sorted(loto_draw)))
         # Winner ranks
@@ -874,8 +957,12 @@ class Economy(BaseCog):
         """
         Event loop to random rate the custom currencies
         """
-        for currency in Currency.select().where(Currency.symbol != DISCORD_MONEY_SYMBOL):
+        currencies = Currency.select().where(
+            Currency.symbol != DISCORD_MONEY_SYMBOL
+        ).order_by(pw.fn.Lower(Currency.name))
+        for currency in currencies:
             mini, maxi = int(-currency.rate * 10), int((2.0 - currency.rate) * 10)
+            seed(self.seeds.pop(0) if self.seeds else None)
             currency.rate += randint(mini, maxi) / 100.0
             currency.rate = round(max(currency.rate, DISCORD_MONEY_MINI), 2)
             currency.save(only=('rate', ))
