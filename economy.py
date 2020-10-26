@@ -627,7 +627,7 @@ class Economy(BaseCog):
                 f"et il vous faut **{round(value,2):n} {currency.symbol}**.")
             return
         # Update balance
-        base_balance -= value
+        base_balance.value -= value
         Balance.update(value=Balance.value - value).where(Balance.id == base_balance.id).execute()
         balance = self.get_balance(user, currency)
         balance += args.amount
