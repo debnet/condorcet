@@ -569,10 +569,10 @@ class Economy(BaseCog):
         Balance.update(value=Balance.value + value).where(Balance.id == base_balance.id).execute()
         # Update currency
         currency.value -= value
-        currency.rate += rate
+        currency.rate -= rate
         Currency.update(
             value=Currency.value - value,
-            rate=Currency.rate + rate
+            rate=Currency.rate - rate
         ).where(Currency.id == currency.id).execute()
         # Message to user
         await ctx.author.send(
@@ -634,10 +634,10 @@ class Economy(BaseCog):
         Balance.update(value=Balance.value + args.amount).where(Balance.id == balance.id).execute()
         # Update currency
         currency.value += value
-        currency.rate -= rate
+        currency.rate += rate
         Currency.update(
             value=Currency.value + value,
-            rate=Currency.rate - rate,
+            rate=Currency.rate + rate,
         ).where(Currency.id == currency.id).execute()
         # Message to user
         # Message to user
