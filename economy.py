@@ -715,6 +715,10 @@ class Economy(BaseCog):
             if currency.symbol != DISCORD_MONEY_SYMBOL:
                 total = Balance.select(pw.fn.SUM(Balance.value)).where(Balance.currency == currency).scalar() or 0.0
                 value = round(args.amount * (currency.value * currency.rate / (total or 1)), 5)
+                # Reduce value of currency
+                subvalue = args.amount * (currency.value / (total or 1))
+                currency.value -= subvalue
+                Currency.update(value=Currency.value - subvalue).where(Currency.id == currency.id).execute()
             LotoDraw.update(value=LotoDraw.value + value).where(LotoDraw.date == date.today()).execute()
         # Create display message
         slot1, slot2, slot3 = sorted(results, reverse=True)
