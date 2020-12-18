@@ -724,14 +724,18 @@ class Economy(BaseCog):
         messages = ["C'est parti !", f"{slots[slot1]}", f"{slots[slot2]}", f"{slots[slot3]}"]
         if ctx.channel and hasattr(ctx.channel, 'name'):
             endpoint = ctx.channel
-            if result:
-                messages.append(f"<@{user.id}> a remporté **{round(result,2):n} {currency.symbol}** ! :slight_smile:")
+            if result > args.amount:
+                messages.append(f"<@{user.id}> a remporté **{round(result,2):n} {currency.symbol}** ! :smile:")
+            elif result:
+                messages.append(f"<@{user.id}> a récupéré sa mise de **{round(result,2):n} {currency.symbol}**. :slight_smile:")
             else:
                 messages.append(f"<@{user.id}> a perdu **{round(args.amount,2):n} {currency.symbol}** ! :frowning:")
         else:
             endpoint = ctx.author
-            if result:
-                messages.append(f"Vous remportez **{round(result,2):n} {currency.symbol}** ! :slight_smile:")
+            if result > args.amount:
+                messages.append(f"Vous remportez **{round(result,2):n} {currency.symbol}** ! :smile:")
+            elif result:
+                messages.append(f"Vous récupérez votre mise de **{round(result,2):n} {currency.symbol}** ! :slight_smile:")
             else:
                 messages.append(f"Vous perdez **{round(args.amount,2):n} {currency.symbol}** ! :frowning:")
         # Display slot machine
@@ -743,6 +747,31 @@ class Economy(BaseCog):
                 await asyncio.sleep(0.5)
         content = '  '.join(messages)
         await message.edit(content=content)
+
+    @commands.command(name='price')
+    async def _price(self, ctx, *args):
+        """
+        Permet de connaître le montant d'une grille de loto et de sa cagnotte actuelle.
+        Usage : `!price`
+        """
+        if ctx.channel and hasattr(ctx.channel, 'name'):
+            await ctx.message.delete()
+        user = await self.get_user(ctx.author)
+        # Argument parser
+        parser = Parser(
+            prog=f'{ctx.prefix}{ctx.command.name}',
+            description="Permet de connaître le montant d'une grille de loto et de sa cagnotte actuelle.")
+        args = parser.parse_args(args)
+        if parser.message:
+            await ctx.author.send(f"```{parser.message}```")
+            return
+        # Calculate price
+        loto = LotoDraw.get_or_none(LotoDraw.date == date.today())
+        currency = self.get_currency(DISCORD_MONEY_SYMBOL)
+        price = round(DISCORD_LOTO_PRICE + round(loto.value / DISCORD_LOTO_LIMIT, 1), 1)
+        await ctx.author.send(
+            f":game_die:  Une grille de loto coûte **~{round(price,2):n} {currency.symbol}**.\n"
+            f":money_bag:  Le montant de la cagnotte est estimé à **~{round(loto.value,2):n} {currency.symbol}**.")
 
     @commands.command(name='loto')
     async def _loto(self, ctx, *args):
