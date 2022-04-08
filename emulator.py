@@ -113,6 +113,9 @@ class Emulator(BaseCog):
             self.game.save_state(file)
         with open(f'{GAME_NAME}.json', 'w') as file:
             json.dump(self.messages, file)
+        if self.key:
+            with open(f'{GAME_NAME}.txt', 'a+') as file:
+                file.write(self.key + '\n')
 
     def image(self, size=GAME_SCREEN_SIZE):
         img = self.game.screen_image()
