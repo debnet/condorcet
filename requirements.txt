@@ -1,4 +1,5 @@
-discord.py<1.5.0
-peewee==3.14.0
-python-dateutil==2.8.1
+peewee==3.14.10
+python-dateutil==2.8.2
 python3-vote-core==20170329.0
+py-cord==1.7.3
+pyboy==1.4.7
