@@ -14,8 +14,8 @@ GAME_NAME = os.environ.get('GAME_NAME') or 'game'
 GAME_CHANNEL = os.environ.get('GAME_CHANNEL') or 'game'
 GAME_SCREEN_SIZE = int(os.environ.get('GAME_SCREEN_SIZE') or 3)
 GAME_TICKS = int(os.environ.get('GAME_TICKS') or 120)
-GAME_MAX_HISTORY = int(os.environ.get('GAME_HISTORY') or 5)
-GAME_DELAY = int(os.environ.get('GAME_DELAY') or 5)
+GAME_MAX_HISTORY = int(os.environ.get('GAME_MAX_HISTORY') or 10)
+GAME_DELAY = int(os.environ.get('GAME_DELAY') or 10)
 
 
 class Emulator(BaseCog):
