@@ -129,7 +129,7 @@ class Emulator(BaseCog):
         if not self.message:
             return
         self.message = await self.channel.fetch_message(self.message.id)
-        if len(self.message.reactions) != len(self.KEY_ICONS):
+        if len(self.message.reactions) < len(self.KEY_ICONS):
             return
         counts = Counter()
         for reaction in self.message.reactions:
