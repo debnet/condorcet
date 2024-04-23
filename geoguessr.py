@@ -128,6 +128,7 @@ class Geoguessr(BaseCog):
             address=address,
             distance=distance,
             score=score,
+            clues=place.clues,
             date=datetime.now(),
         ).on_conflict_replace().execute()
         await context.author.send(
@@ -159,7 +160,7 @@ class Geoguessr(BaseCog):
             for index, guess in enumerate(guesses, start=1):
                 messages.append(
                     f"- {self.ICONS.get(index, '')}  <@{guess.user_id}> - "
-                    f"Distance: `{guess.distance}` - Indices: `{guess.clues}` - **Score: {guess.score}**"
+                    f"Distance: `{round(guess.distance)} m` - Indices: `{guess.clues}` - **Score: {guess.score}**"
                 )
             if messages:
                 await channel.send(":1234:  Voici le classement des participants du jour:\n" + "\n".join(messages))
