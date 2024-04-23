@@ -6,7 +6,7 @@ import peewee as pw
 import random
 import re
 import requests
-from datetime import datetime, date
+from datetime import datetime, time
 from dataclasses import dataclass
 from io import BytesIO
 
@@ -92,6 +92,12 @@ class Geoguessr(BaseCog):
         super().__init__(*args, **kwargs)
         database.create_tables((Place, Guess))
         self.world = gpd.read_file(WORLD_DATA)
+        self._new_place.start()
+        self._new_clue.start()
+
+    def cog_unload(self):
+        self._new_place.cancel()
+        self._new_clue.cancel()
 
     @commands.command(name="guess")
     async def _guess(self, context=None, *, message):
@@ -211,15 +217,13 @@ class Geoguessr(BaseCog):
         place.clues += 1
         place.save(only=("clues",))
 
-    @tasks.loop(hours=1)
+    @tasks.loop(time=time(0, 0))
     async def _new_place(self):
-        if datetime.now().hour == 0:
-            await self._place(context=None)
+        await self._place(context=None)
 
-    @tasks.loop(hours=1)
+    @tasks.loop(time=(time(16, 0), time(18, 0), time(20, 0)))
     async def _new_clue(self):
-        if datetime.now().hour in (16, 18, 20):
-            await self._clue(context=None)
+        await self._clue(context=None)
 
     def get_coords(self, address: str) -> tuple[str, int, int]:
         """

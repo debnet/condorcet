@@ -1,7 +1,7 @@
 # coding: utf-8
 import discord
 import peewee as pw
-from datetime import date
+from datetime import date, time
 from dateutil.parser import parse as parse_date
 from discord.ext import commands, tasks
 from base import DISCORD_CHANNEL, BaseCog, User, database
@@ -74,7 +74,7 @@ class HappyBirthday(BaseCog):
             birthday.delete_instance()
             await context.author.send(f":white_check_mark:  Votre date de naissance a été supprimée !")
 
-    @tasks.loop(hours=1)
+    @tasks.loop(time=time(0, 0))
     async def _check_birthday(self):
         """
         Event loop to announce birthdays
