@@ -9,11 +9,13 @@ from birthday import HappyBirthday
 from rolemanager import RoleManager
 from economy import Economy
 from emulator import Emulator
+from geoguessr import Geoguessr
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     locale.setlocale(locale.LC_ALL, DISCORD_LOCALE)
     intents = Intents.default()
+    intents.message_content = True
     intents.members = True
     intents.presences = True
     bot = commands.Bot(command_prefix=DISCORD_OPERATOR, intents=intents)
@@ -22,4 +24,5 @@ if __name__ == '__main__':
     bot.add_cog(RoleManager(bot))
     bot.add_cog(Economy(bot))
     bot.add_cog(Emulator(bot))
+    bot.add_cog(Geoguessr(bot))
     bot.run(DISCORD_TOKEN)
