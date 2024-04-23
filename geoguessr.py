@@ -219,7 +219,7 @@ class Geoguessr(BaseCog):
     async def _new_clue(self):
         await self._clue(context=None)
 
-    def get_coords(self, address: str) -> tuple[str, int, int] | None:
+    def get_coords(self, address: str) -> tuple[str, int, int]:
         """
         Find coordinates relative to an address
         :param address: Plain text address
@@ -234,7 +234,7 @@ class Geoguessr(BaseCog):
             },
         ).json()
         if not response or response["status"] != "OK":
-            return None
+            return
         result = response["results"][0]
         return (
             result.get("formatted_address", ""),
