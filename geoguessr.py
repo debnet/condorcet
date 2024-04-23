@@ -6,7 +6,7 @@ import peewee as pw
 import random
 import re
 import requests
-from datetime import datetime, time
+from datetime import datetime, date
 from dataclasses import dataclass
 from io import BytesIO
 
@@ -211,13 +211,15 @@ class Geoguessr(BaseCog):
         place.clues += 1
         place.save(only=("clues",))
 
-    @tasks.loop(time=time(0, 0))
+    @tasks.loop(hours=1)
     async def _new_place(self):
-        await self._place(context=None)
+        if datetime.now().hour == 0:
+            await self._place(context=None)
 
-    @tasks.loop(time=(time(16, 0), time(18, 0), time(20, 0)))
+    @tasks.loop(hours=1)
     async def _new_clue(self):
-        await self._clue(context=None)
+        if datetime.now().hour in (16, 18, 20):
+            await self._clue(context=None)
 
     def get_coords(self, address: str) -> tuple[str, int, int]:
         """
