@@ -222,7 +222,7 @@ class Geoguessr(BaseCog):
     async def _new_place(self):
         await self._place(context=None)
 
-    @tasks.loop(time=(time(16, 0), time(18, 0), time(20, 0)))
+    @tasks.loop(time=(time(14, 0), time(17, 0), time(20, 0)))
     async def _new_clue(self):
         await self._clue(context=None)
 
