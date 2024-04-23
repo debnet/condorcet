@@ -51,7 +51,7 @@ class Emulator(BaseCog):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.game = PyBoy(f"{GAME_NAME}.gb", window="null")
+        self.game = PyBoy(GAME_NAME, window="null", cgb=True)
         self.channel = None
         self.message = None
         self.messages = []
