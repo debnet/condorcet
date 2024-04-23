@@ -83,14 +83,14 @@ class HappyBirthday(BaseCog):
         if not channel:
             return
         birthdays, today = [], date.today()
-        for birthday in Birthday.select().join(User).where(Birthday.last_check < today):
+        for birthday in Birthday.select().where(Birthday.last_check < today):
             if (today.day, today.month) != (birthday.birth_date.day, birthday.birth_date.month):
                 continue
             if birthday.date_only:
-                birthdays.append(f"<@{birthday.user.id}>")
+                birthdays.append(f"<@{birthday.user_id}>")
             else:
                 age = int((today - birthday.birth_date).days / 365)
-                birthdays.append(f"<@{birthday.user.id}> ({age} ans)")
+                birthdays.append(f"<@{birthday.user_id}> ({age} ans)")
             birthday.last_check = today
             birthday.save(only=("last_check",))
         if birthdays:
