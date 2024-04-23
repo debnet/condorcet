@@ -18,7 +18,7 @@ GAME_SCREEN_SIZE = int(os.environ.get("GAME_SCREEN_SIZE") or 3)
 GAME_TICKS = int(os.environ.get("GAME_TICKS") or 60)
 GAME_SPEED = int(os.environ.get("GAME_SPEED") or 120)
 GAME_MAX_HISTORY = int(os.environ.get("GAME_MAX_HISTORY") or 10)
-GAME_DELAY = int(os.environ.get("GAME_DELAY") or 5)
+GAME_DELAY = int(os.environ.get("GAME_DELAY") or 10)
 
 
 class Emulator(BaseCog):
@@ -38,14 +38,14 @@ class Emulator(BaseCog):
     }
 
     KEYS = {
-        "up": (WindowEvent.PRESS_ARROW_UP, WindowEvent.RELEASE_ARROW_UP, 8),
-        "down": (WindowEvent.PRESS_ARROW_DOWN, WindowEvent.RELEASE_ARROW_DOWN, 8),
-        "left": (WindowEvent.PRESS_ARROW_LEFT, WindowEvent.RELEASE_ARROW_LEFT, 8),
-        "right": (WindowEvent.PRESS_ARROW_RIGHT, WindowEvent.RELEASE_ARROW_RIGHT, 8),
-        "A": (WindowEvent.PRESS_BUTTON_A, WindowEvent.RELEASE_BUTTON_A, 8),
-        "B": (WindowEvent.PRESS_BUTTON_B, WindowEvent.RELEASE_BUTTON_B, 8),
-        "start": (WindowEvent.PRESS_BUTTON_START, WindowEvent.RELEASE_BUTTON_START, 8),
-        "select": (WindowEvent.PRESS_BUTTON_SELECT, WindowEvent.RELEASE_BUTTON_SELECT, 8),
+        "up": (WindowEvent.PRESS_ARROW_UP, WindowEvent.RELEASE_ARROW_UP, 10),
+        "down": (WindowEvent.PRESS_ARROW_DOWN, WindowEvent.RELEASE_ARROW_DOWN, 10),
+        "left": (WindowEvent.PRESS_ARROW_LEFT, WindowEvent.RELEASE_ARROW_LEFT, 10),
+        "right": (WindowEvent.PRESS_ARROW_RIGHT, WindowEvent.RELEASE_ARROW_RIGHT, 10),
+        "A": (WindowEvent.PRESS_BUTTON_A, WindowEvent.RELEASE_BUTTON_A, 10),
+        "B": (WindowEvent.PRESS_BUTTON_B, WindowEvent.RELEASE_BUTTON_B, 10),
+        "start": (WindowEvent.PRESS_BUTTON_START, WindowEvent.RELEASE_BUTTON_START, 10),
+        "select": (WindowEvent.PRESS_BUTTON_SELECT, WindowEvent.RELEASE_BUTTON_SELECT, 10),
         "speed": (None, None, GAME_SPEED),
     }
 
