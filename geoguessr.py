@@ -148,7 +148,6 @@ class Geoguessr(BaseCog):
         channel = discord.utils.get(self.bot.get_all_channels(), name=GEOGUESSR_CHANNEL)
         if not channel:
             return
-        user = await self.get_user(context.author)
         place = Place.select().order_by(Place.date.desc()).first()
         if place:
             await channel.send(
