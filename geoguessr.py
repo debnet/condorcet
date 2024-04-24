@@ -334,6 +334,15 @@ class Geoguessr(BaseCog):
         maptype: str = "satellite",
         **kwargs,
     ):
+        """
+        Get a satellite image from Google Maps API.
+        :param center: Coordinates.
+        :param zoom: Zoom level
+        :param size: Image size.
+        :param scale: Image scale.
+        :param format: Image file format.
+        :param maptype: Map type
+        """
         response = requests.get(
             GOOGLE_MAPS_ENDPOINT,
             params={
@@ -349,6 +358,10 @@ class Geoguessr(BaseCog):
         return Image.open(BytesIO(response.content)).convert("RGB")
 
     def create(self, directory: str = "images/", **kwargs):
+        """
+        Create all images (satellite & streetview) from coordinates.
+        :param directory: Output directory.
+        """
         os.makedirs(directory, exist_ok=True)
         coords = self.find_image(**kwargs)
         img = self.get_map(coords)
