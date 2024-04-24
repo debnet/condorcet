@@ -10,6 +10,7 @@ from datetime import datetime, time
 from dataclasses import dataclass
 from io import BytesIO
 
+import matplotlib.pyplot as plt
 from discord.ext import commands, tasks
 from shapely import Point
 from PIL import Image, ImageDraw
@@ -17,7 +18,8 @@ from PIL import Image, ImageDraw
 from base import BaseCog, User, database, logger, DISCORD_ADMIN
 
 
-GEOGUESSR_CHANNEL = os.environ.get("MAP_CHANNEL") or "geoguessr"
+GEOGUESSR_CHANNEL = os.environ.get("GEOGUESSR_CHANNEL") or "geoguessr"
+GEOGUESSR_IMAGES = os.environ.get("GEOGUESSR_IMAGES") or "images"
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY")
 WORLD_DATA = os.environ.get("WORLD_DATA") or "france.shp.zip"
 
@@ -92,6 +94,7 @@ class Geoguessr(BaseCog):
         super().__init__(*args, **kwargs)
         database.create_tables((Place, Guess))
         self.world = gpd.read_file(WORLD_DATA)
+        self.current = None
         self._new_place.start()
         self._new_clue.start()
 
@@ -119,7 +122,7 @@ class Geoguessr(BaseCog):
             await context.author.send(":no_entry_sign:  Cette adresse n'existe pas, veuillez réessayer !")
             return
         distance = Coordinates(lat, lng).distance(place.coords)
-        score = round(max(0, (5000 - distance) / (1 + place.clues / 3)), 0)
+        score = round(max(0, (5000 - distance) / (1 + place.clues / 5)), 0)
         Guess.insert(
             place=place,
             user=user,
@@ -159,7 +162,7 @@ class Geoguessr(BaseCog):
             for index, guess in enumerate(guesses, start=1):
                 messages.append(
                     f"- {self.ICONS.get(str(index), '')}  <@{guess.user_id}> - "
-                    f"Distance: `{round(guess.distance)} m` - Indices: `{guess.clues}` - **Score: {guess.score}**"
+                    f"Distance: `{round(guess.distance)} m` - Indices: `{guess.clues}` - Score: **{guess.score} points**"
                 )
             if messages:
                 await channel.send(":1234:  Voici le classement des participants du jour:\n" + "\n".join(messages))
@@ -199,18 +202,34 @@ class Geoguessr(BaseCog):
             return
         if place.clues == 0:
             await channel.send(
-                f":bulb:  Besoin d'un petit indice ? Allez je vous file un coup de main ! "
-                f"La région dans laquelle vous devez chercher est **{place.region}**."
+                f":bulb:  C'est l'heure du premier indice ! J'espère qu'il vous mettra sur la bonne piste.\n"
+                f":one:  La région dans laquelle vous devez chercher est **{place.region}**."
             )
         elif place.clues == 1:
             await channel.send(
-                f":bulb:  Encore bloqué ? Laissez-moi vous aider avec ce deuxième indice ! "
-                f"Le département dans lequel vous devez chercher est **{place.department}**."
+                f":bulb:  Voici le deuxième indice ! Ça vous aidera à réduire votre champ de recherche.\n"
+                f":two:  Le département dans lequel vous devez chercher est **{place.department}**."
             )
         elif place.clues == 2:
+            poly = gpd.GeoSeries(self.current["geometry"])
+            poly.plot()
+            plt.axis("off")
+            plt.savefig(f"{GEOGUESSR_IMAGES}/@.jpg", bbox_inches="tight")
             await channel.send(
-                f":bulb:  Pas facile hein ? Un dernier indice en espérant que ça vous aide ! "
-                f"La ville dans laquelle vous devez chercher est **{place.city}**."
+                f":bulb:  Vous n'avez pas encore trouvé ? Ce troisième indice devrait vous donner un coup de pouce.\n"
+                f":three:  La ville que vous cherchez possède une aire urbaine qui a vaguement cette forme :",
+                file=discord.File(f"{GEOGUESSR_IMAGES}/@.jpg"),
+            )
+        elif place.clues == 3:
+            pop, area = self.current["POPULATION"], round(self.current["AREA"], 2)
+            await channel.send(
+                f":bulb:  C'est pas simple hein ? Avec ce quatrième indice vous devriez trouver plus facilement !\n"
+                f":four:  La ville que vous cherchez comptait **{pop} habitants** répartis sur environ **{area} km²**."
+            )
+        elif place.clues == 4:
+            await channel.send(
+                f":bulb:  C'est bientôt fini ! Voici le dernier indice, avec ça vous savez où chercher désormais !\n"
+                f":five:  La ville dans laquelle les photos ont été prises est **{place.city}**."
             )
         else:
             return
@@ -221,7 +240,15 @@ class Geoguessr(BaseCog):
     async def _new_place(self):
         await self._place(context=None)
 
-    @tasks.loop(time=(time(12, 0), time(15, 0), time(18, 0)))
+    @tasks.loop(
+        time=(
+            time(10, 0),
+            time(12, 0),
+            time(14, 0),
+            time(16, 0),
+            time(18, 0),
+        )
+    )
     async def _new_clue(self):
         await self._clue(context=None)
 
@@ -261,7 +288,8 @@ class Geoguessr(BaseCog):
             coords = Coordinates(random.uniform(min_lat, max_lat), random.uniform(min_lng, max_lng))
             if coords.within(country.geometry.values[0]):
                 image_found, coords = self.has_image(coords, radius)
-        coords.city, coords.department, coords.region = country[["NAME", "DEPARTMENT", "REGION"]].values[0]
+        self.current = city = country.iloc[0].to_dict()
+        coords.city, coords.department, coords.region = city["NAME"], city["DEPARTMENT"], city["REGION"]
         logger.info(f"{coords.city} ({coords.department} - {coords.region}): ({coords.lat}, {coords.lng})")
         return coords
 
@@ -357,7 +385,7 @@ class Geoguessr(BaseCog):
         )
         return Image.open(BytesIO(response.content)).convert("RGB")
 
-    def create(self, directory: str = "images/", **kwargs):
+    def create(self, directory: str = GEOGUESSR_IMAGES, **kwargs):
         """
         Create all images (satellite & streetview) from coordinates.
         :param directory: Output directory.
@@ -365,11 +393,11 @@ class Geoguessr(BaseCog):
         os.makedirs(directory, exist_ok=True)
         coords = self.find_image(**kwargs)
         img = self.get_map(coords)
-        img.save(f"{directory}_.jpg")
+        img.save(f"{directory}/_.jpg")
         for direction, heading in zip("NESW", range(0, 360, 90)):
             img = self.get_image(coords, heading=heading, **kwargs)
             draw = ImageDraw.Draw(img)
             draw.rectangle((0, 0, 12, 12), fill=(0, 0, 0))
             draw.text((0, 0), direction)
-            img.save(f"{directory}{direction}.jpg")
+            img.save(f"{directory}/{direction}.jpg")
         return coords
