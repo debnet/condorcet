@@ -28,7 +28,7 @@ GOOGLE_MAPS_ENDPOINT = "https://maps.googleapis.com/maps/api/staticmap"
 GOOGLE_ADDRESS_ENDPOINT = "https://maps.googleapis.com/maps/api/geocode/json"
 GOOGLE_URL = "https://maps.google.com/?q="
 
-regex_coords = re.compile(r"(?P<lat>-?\d+(\.?\d+)?),?\s+(?P<lng>-?\d+(\.?\d+)?)")
+regex_coords = re.compile(r"(?P<lat>-?\d+(\.?\d+)?)[,\s]+(?P<lng>-?\d+(\.?\d+)?)")
 
 
 class Place(pw.Model):
@@ -134,10 +134,11 @@ class Geoguessr(BaseCog):
             clues=place.clues,
             date=datetime.now(),
         ).on_conflict_replace().execute()
+        today = datetime.today()
         await context.author.send(
-            f":white_check_mark:  Votre proposition a bien été enregistrée pour le Geoguessr du jour !\n"
+            f":white_check_mark:  Votre proposition a bien été enregistrée pour le Geoguessr du {today:%A %d %B %Y} !\n"
             f"**Adresse:** `{address or 'N/A'}` - **Coordonnées:** `{lat}, {lng}` - "
-            f"**Indices:** `{place.clues}` - **Lien:** {GOOGLE_URL}{lat},{lng}"
+            f"**Indices:** `{place.clues}`\n**Voir le lieu:** {GOOGLE_URL}{lat},{lng}"
         )
 
     @commands.command(name="place")
@@ -155,7 +156,7 @@ class Geoguessr(BaseCog):
         if place:
             await channel.send(
                 f":checkered_flag:  **Terminé !** La réponse était dans la ville de **{place.city}** "
-                f"({place.department}, {place.region}) ! {GOOGLE_URL}{place.lat},{place.lng}"
+                f"({place.department}, {place.region}) !\n*Voir le lieu:* {GOOGLE_URL}{place.lat},{place.lng}"
             )
             messages = []
             guesses = Guess.select().filter(Guess.place == place).order_by(Guess.score.desc())
@@ -165,7 +166,10 @@ class Geoguessr(BaseCog):
                     f"Distance: `{round(guess.distance)} m` - Indices: `{guess.clues}` - Score: **{guess.score} points**"
                 )
             if messages:
-                await channel.send(":1234:  Voici le classement des participants du jour:\n" + "\n".join(messages))
+                message = await channel.send(
+                    f":trophy:  Voici le classement des participants du jour:\n{'\n'.join(messages)}"
+                )
+                await message.pin(reason="Classement des participants")
         coords = self.create()
         Place.create(
             city=coords.city,
@@ -174,9 +178,10 @@ class Geoguessr(BaseCog):
             lat=coords.lat,
             lng=coords.lng,
         )
-        await channel.send(
-            f":map:  **Geoguessr du jour !** Trouvez en moins de 24h le lieu sur les photographies.\n"
-            f":information:  Utilisez la commande `!guess <adresse>` ou `!guess <lat> <lng>` pour proposer une réponse.",
+        today = datetime.today()
+        message = await channel.send(
+            f":map:  **Geoguessr du {today:%A %d %B %Y} !** Trouvez le lieu des photographies en moins de 24h .\n"
+            f":information:  Utilisez la commande `!guess <adresse>` ou `!guess <lat>,<lng>` pour proposer une réponse.",
             files=(
                 discord.File(f"images/_.jpg"),
                 discord.File(f"images/N.jpg"),
@@ -185,6 +190,7 @@ class Geoguessr(BaseCog):
                 discord.File(f"images/W.jpg"),
             ),
         )
+        await message.pin(reason=f"Geoguessr du {today:%A %d %B %Y}")
 
     @commands.command(name="clue")
     @commands.has_role(DISCORD_ADMIN)
@@ -200,37 +206,46 @@ class Geoguessr(BaseCog):
         place = Place.select().order_by(Place.date.desc()).first()
         if not place:
             return
+        if not self.current:
+            df = self.world
+            predicate = (df.NAME == place.city) & (df.DEPARTMENT == place.department) & (df.REGION == place.region)
+            self.current = df[predicate].iloc[0].to_dict()
         if place.clues == 0:
-            await channel.send(
+            message = await channel.send(
                 f":bulb:  C'est l'heure du premier indice ! J'espère qu'il vous mettra sur la bonne piste.\n"
                 f":one:  La région dans laquelle vous devez chercher est **{place.region}**."
             )
+            await message.pin(reason="Indice n°1")
         elif place.clues == 1:
-            await channel.send(
+            message = await channel.send(
                 f":bulb:  Voici le deuxième indice ! Ça vous aidera à réduire votre champ de recherche.\n"
                 f":two:  Le département dans lequel vous devez chercher est **{place.department}**."
             )
+            await message.pin(reason="Indice n°2")
         elif place.clues == 2:
             poly = gpd.GeoSeries(self.current["geometry"])
             poly.plot()
             plt.axis("off")
             plt.savefig(f"{GEOGUESSR_IMAGES}/@.jpg", bbox_inches="tight")
-            await channel.send(
+            message = await channel.send(
                 f":bulb:  Vous n'avez pas encore trouvé ? Ce troisième indice devrait vous donner un coup de pouce.\n"
                 f":three:  La ville que vous cherchez possède une aire urbaine qui a vaguement cette forme :",
                 file=discord.File(f"{GEOGUESSR_IMAGES}/@.jpg"),
             )
+            await message.pin(reason="Indice n°3")
         elif place.clues == 3:
             pop, area = self.current["POPULATION"], round(self.current["AREA"], 2)
-            await channel.send(
+            message = await channel.send(
                 f":bulb:  C'est pas simple hein ? Avec ce quatrième indice vous devriez trouver plus facilement !\n"
                 f":four:  La ville que vous cherchez comptait **{pop} habitants** répartis sur environ **{area} km²**."
             )
+            await message.pin(reason="Indice n°4")
         elif place.clues == 4:
-            await channel.send(
+            message = await channel.send(
                 f":bulb:  C'est bientôt fini ! Voici le dernier indice, avec ça vous savez où chercher désormais !\n"
                 f":five:  La ville dans laquelle les photos ont été prises est **{place.city}**."
             )
+            await message.pin(reason="Indice n°5")
         else:
             return
         place.clues += 1
