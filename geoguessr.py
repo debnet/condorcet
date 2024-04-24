@@ -167,7 +167,7 @@ class Geoguessr(BaseCog):
                 )
             if messages:
                 message = await channel.send(
-                    f":trophy:  Voici le classement des participants du jour:\n{'\n'.join(messages)}"
+                    ":trophy:  Voici le classement des participants du jour:\n" + "\n".join(messages)
                 )
                 await message.pin(reason="Classement des participants")
         coords = self.create()
