@@ -293,7 +293,7 @@ class Geoguessr(BaseCog):
         logger.info(f"{coords.city} ({coords.department} - {coords.region}): ({coords.lat}, {coords.lng})")
         return coords
 
-    def has_image(self, coords: Coordinates, radius: int = 1000, **kwargs) -> tuple((bool, Coordinates)):
+    def has_image(self, coords: Coordinates, radius: int = 1000, **kwargs) -> tuple[bool, Coordinates]:
         """
         Check if the location has an image.
         :param coords: Coordinates.
