@@ -158,7 +158,7 @@ class Geoguessr(BaseCog):
             guesses = Guess.select().filter(Guess.place == place).order_by(Guess.score.desc())
             for index, guess in enumerate(guesses, start=1):
                 messages.append(
-                    f"- {self.ICONS.get(index, '')}  <@{guess.user_id}> - "
+                    f"- {self.ICONS.get(str(index), '')}  <@{guess.user_id}> - "
                     f"Distance: `{round(guess.distance)} m` - Indices: `{guess.clues}` - **Score: {guess.score}**"
                 )
             if messages:
