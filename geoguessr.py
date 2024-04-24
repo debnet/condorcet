@@ -26,7 +26,7 @@ GOOGLE_MAPS_ENDPOINT = "https://maps.googleapis.com/maps/api/staticmap"
 GOOGLE_ADDRESS_ENDPOINT = "https://maps.googleapis.com/maps/api/geocode/json"
 GOOGLE_URL = "https://maps.google.com/?q="
 
-regex_coords = re.compile(r"(?P<lat>-?\d+(\.?\d+)?)\s+(?P<lng>-?\d+(\.?\d+)?)")
+regex_coords = re.compile(r"(?P<lat>-?\d+(\.?\d+)?),*\s+(?P<lng>-?\d+(\.?\d+)?)")
 
 
 class Place(pw.Model):
