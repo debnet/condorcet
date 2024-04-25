@@ -94,7 +94,7 @@ class Geoguessr(BaseCog):
         super().__init__(*args, **kwargs)
         database.create_tables((Place, Guess))
         self.world = gpd.read_file(WORLD_DATA)
-        self.current = None
+        self.current, self.last_message = None, None
         self._new_place.start()
         self._new_clue.start()
 
@@ -154,7 +154,7 @@ class Geoguessr(BaseCog):
             return
         place = Place.select().order_by(Place.date.desc()).first()
         if place:
-            await channel.send(
+            self.last_message = await channel.send(
                 f":checkered_flag:  **Terminé !** La réponse était dans la ville de **{place.city}** "
                 f"({place.department}, {place.region}) !\n*Voir le lieu:* {GOOGLE_URL}{place.lat},{place.lng}"
             )
@@ -166,10 +166,10 @@ class Geoguessr(BaseCog):
                     f"Distance: `{round(guess.distance)} m` - Indices: `{guess.clues}` - Score: **{guess.score} points**"
                 )
             if messages:
-                message = await channel.send(
+                self.last_message = await channel.send(
                     ":trophy:  Voici le classement des participants du jour:\n" + "\n".join(messages)
                 )
-                await message.pin(reason="Classement des participants")
+                await self.last_message.pin(reason="Classement des participants")
         coords = self.create()
         Place.create(
             city=coords.city,
@@ -179,8 +179,8 @@ class Geoguessr(BaseCog):
             lng=coords.lng,
         )
         today = datetime.today()
-        message = await channel.send(
-            f":map:  **Geoguessr du {today:%A %d %B %Y} !** Trouvez le lieu des photographies en moins de 24h .\n"
+        self.last_message = await channel.send(
+            f":map:  **Geoguessr du {today:%A %d %B %Y} !** Trouvez le lieu des photographies en moins de 24h.\n"
             f":information:  Utilisez la commande `!guess <adresse>` ou `!guess <lat>,<lng>` pour proposer une réponse.",
             files=(
                 discord.File(f"images/_.jpg"),
@@ -190,7 +190,7 @@ class Geoguessr(BaseCog):
                 discord.File(f"images/W.jpg"),
             ),
         )
-        await message.pin(reason=f"Geoguessr du {today:%A %d %B %Y}")
+        await self.last_message.pin(reason=f"Geoguessr du {today:%A %d %B %Y}")
 
     @commands.command(name="clue")
     @commands.has_role(DISCORD_ADMIN)
@@ -211,41 +211,41 @@ class Geoguessr(BaseCog):
             predicate = (df.NAME == place.city) & (df.DEPARTMENT == place.department) & (df.REGION == place.region)
             self.current = df[predicate].iloc[0].to_dict()
         if place.clues == 0:
-            message = await channel.send(
+            self.last_message = await channel.send(
                 f":bulb:  C'est l'heure du premier indice ! J'espère qu'il vous mettra sur la bonne piste.\n"
                 f":one:  La région dans laquelle vous devez chercher est **{place.region}**."
             )
-            await message.pin(reason="Indice n°1")
+            # await self.last_message.pin(reason="Indice n°1")
         elif place.clues == 1:
-            message = await channel.send(
+            self.last_message = await channel.send(
                 f":bulb:  Voici le deuxième indice ! Ça vous aidera à réduire votre champ de recherche.\n"
                 f":two:  Le département dans lequel vous devez chercher est **{place.department}**."
             )
-            await message.pin(reason="Indice n°2")
+            # await self.last_message.pin(reason="Indice n°2")
         elif place.clues == 2:
             poly = gpd.GeoSeries(self.current["geometry"])
             poly.plot()
             plt.axis("off")
             plt.savefig(f"{GEOGUESSR_IMAGES}/@.jpg", bbox_inches="tight")
-            message = await channel.send(
+            self.last_message = await channel.send(
                 f":bulb:  Vous n'avez pas encore trouvé ? Ce troisième indice devrait vous donner un coup de pouce.\n"
                 f":three:  La ville que vous cherchez possède une aire urbaine qui a vaguement cette forme :",
                 file=discord.File(f"{GEOGUESSR_IMAGES}/@.jpg"),
             )
-            await message.pin(reason="Indice n°3")
+            # await self.last_message.pin(reason="Indice n°3")
         elif place.clues == 3:
             pop, area = self.current["POPULATION"], round(self.current["AREA"], 2)
-            message = await channel.send(
+            self.last_message = await channel.send(
                 f":bulb:  C'est pas simple hein ? Avec ce quatrième indice vous devriez trouver plus facilement !\n"
                 f":four:  La ville que vous cherchez comptait **{pop} habitants** répartis sur environ **{area} km²**."
             )
-            await message.pin(reason="Indice n°4")
+            # await self.last_message.pin(reason="Indice n°4")
         elif place.clues == 4:
-            message = await channel.send(
+            self.last_message = await channel.send(
                 f":bulb:  C'est bientôt fini ! Voici le dernier indice, avec ça vous savez où chercher désormais !\n"
                 f":five:  La ville dans laquelle les photos ont été prises est **{place.city}**."
             )
-            await message.pin(reason="Indice n°5")
+            # await self.last_message.pin(reason="Indice n°5")
         else:
             return
         place.clues += 1
