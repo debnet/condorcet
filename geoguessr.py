@@ -223,14 +223,19 @@ class Geoguessr(BaseCog):
             )
             # await self.last_message.pin(reason="Indice n°2")
         elif place.clues == 2:
+            fig, ax = plt.subplots()
             poly = gpd.GeoSeries(self.current["geometry"])
-            poly.plot()
-            plt.axis("off")
-            plt.savefig(f"{GEOGUESSR_IMAGES}/@.jpg", bbox_inches="tight")
+            poly.plot(color="C1", ax=ax)
+            neighbours = self.world[self.world.geometry.touches(self.current["geometry"])]
+            if not neighbours.empty:
+                poly = gpd.GeoSeries(neighbours.geometry)
+                poly.plot(color="C0", ax=ax)
+            ax.axis("off")
+            fig.savefig(f"{GEOGUESSR_IMAGES}/1.jpg", bbox_inches="tight")
             self.last_message = await channel.send(
                 f":bulb:  Vous n'avez pas encore trouvé ? Ce troisième indice devrait vous donner un coup de pouce.\n"
-                f":three:  La ville que vous cherchez possède une aire urbaine qui a vaguement cette forme :",
-                file=discord.File(f"{GEOGUESSR_IMAGES}/@.jpg"),
+                f":three:  Voici la forme de l'aire de la ville que vous cherchez ainsi que celle de ses voisines :",
+                file=discord.File(f"{GEOGUESSR_IMAGES}/1.jpg"),
             )
             # await self.last_message.pin(reason="Indice n°3")
         elif place.clues == 3:
