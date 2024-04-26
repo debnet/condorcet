@@ -88,9 +88,13 @@ class Emulator(BaseCog):
                 duration=16,
                 loop=0,
             )
-        self.message = await self.channel.send(file=discord.File(f"{GAME_NAME}.gif"))
-        for icon in self.KEY_ICONS:
-            await self.message.add_reaction(icon)
+        try:
+            self.message = await self.channel.send(file=discord.File(f"{GAME_NAME}.gif"))
+            for icon in self.KEY_ICONS:
+                await self.message.add_reaction(icon)
+        except:
+            self.messages.clear()
+            return
         self.messages.append(self.message.id)
         self.do_save()
 
