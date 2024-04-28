@@ -20,8 +20,9 @@ GAME_TICKS = int(os.environ.get("GAME_TICKS") or 60)
 GAME_SPEED = int(os.environ.get("GAME_SPEED") or 120)
 GAME_MAX_HISTORY = int(os.environ.get("GAME_MAX_HISTORY") or 10)
 GAME_DELAY = int(os.environ.get("GAME_DELAY") or 10)
+GAME_USE_CLOCK = int(os.environ.get("GAME_USE_CLOCK") or True)
 
-regex_time = re.compile(r"((?P<day>[0-6])\s)?(?P<hours>[1-2]?\d)[:\s](?P<minutes>[0-5]\d)")
+regex_time = re.compile(r"((?P<day>[1-7])\s)?(?P<hours>[1-2]?\d)[:\s](?P<minutes>[0-5]\d)")
 
 
 class Emulator(BaseCog):
@@ -60,6 +61,7 @@ class Emulator(BaseCog):
         self.messages = []
         self.screenshots = []
         self.last_vote = None
+        self.current_time = True
         self.do_load()
         self.cron.start()
 
@@ -85,7 +87,11 @@ class Emulator(BaseCog):
         """
         if context and context.channel and hasattr(context.channel, "name"):
             await context.message.delete()
+        if GAME_USE_CLOCK:
+            await context.author.send(":no_entry:  Ce jeu n'utilise pas d'horloge interne !")
+            return
         if match := regex_time.match(time):
+            self.current_time = False
             hours, minutes = match.group("hours"), match.group("minutes")
             self.game.memory[0xD4B7] = int(hours)
             self.game.memory[0xD4B8] = int(minutes)
@@ -93,16 +99,19 @@ class Emulator(BaseCog):
             if day := match.group("day"):
                 self.game.memory[0xD4B6] = int(day)
                 days = {
-                    "0": "dimanche",
                     "1": "lundi",
                     "2": "mardi",
                     "3": "mercredi",
                     "4": "jeudi",
                     "5": "vendredi",
                     "6": "samedi",
+                    "7": "dimanche",
                 }
                 label = f"{days[day]} {hours}:{minutes}"
             await self.channel.send(f":alarm_clock:  L'heure du jeu a été changée à **{label}** !")
+        else:
+            self.current_time = True
+            await self.channel.send(f":alarm_clock:  L'heure du jeu suivra désormais l'heure actuelle !")
 
     @commands.command(name="save")
     @commands.has_role(DISCORD_ADMIN)
@@ -169,6 +178,7 @@ class Emulator(BaseCog):
                 format="GIF",
                 save_all=True,
                 append_images=self.screenshots,
+                duration=16,
                 loop=0,
             )
             try:
@@ -224,6 +234,11 @@ class Emulator(BaseCog):
 
     @tasks.loop(seconds=3)
     async def cron(self):
+        if GAME_USE_CLOCK and self.game and not self.current_time:
+            now = datetime.now()
+            self.game.memory[0xD4B6] = now.isoweekday()
+            self.game.memory[0xD4B7] = now.hour
+            self.game.memory[0xD4B8] = now.minute
         if not self.message:
             return
         self.message = await self.channel.fetch_message(self.message.id)
