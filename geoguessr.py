@@ -103,7 +103,7 @@ class Geoguessr(BaseCog):
         self._new_clue.cancel()
 
     @commands.command(name="guess")
-    async def _guess(self, context=None, *, message):
+    async def _guess(self, context=None, *, message: str):
         """
         Permet de fournir une proposition à l'énigme Geoguessr du jour
         """
