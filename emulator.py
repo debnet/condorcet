@@ -11,7 +11,7 @@ from discord.ext import commands, tasks
 from pyboy import PyBoy
 from pyboy.utils import WindowEvent
 
-from base import BaseCog, DISCORD_ADMIN
+from base import BaseCog, DISCORD_ADMIN, logger
 
 GAME_NAME = os.environ.get("GAME_NAME") or "game"
 GAME_CHANNEL = os.environ.get("GAME_CHANNEL") or "game"
@@ -56,6 +56,7 @@ class Emulator(BaseCog):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.game = PyBoy(GAME_NAME, window="null", cgb=True)
+        self.game.set_emulation_speed(0)
         self.channel = None
         self.message = None
         self.messages = []
@@ -76,8 +77,13 @@ class Emulator(BaseCog):
         if not self.messages:
             self.do_screenshot()
             await self.next()
-        else:
+            return
+        try:
             self.message = await self.channel.fetch_message(self.messages[-1])
+        except Exception as e:
+            logger.error(f"Error when retrieving last message: {e}")
+            self.do_screenshot()
+            await self.next()
 
     @commands.command(name="time")
     @commands.has_role(DISCORD_ADMIN)
@@ -145,7 +151,8 @@ class Emulator(BaseCog):
             with open(f"saves/{filename}.state", "rb") as file:
                 self.game.save_state(file)
             await self.channel.send(f":floppy_disk:  L'état du jeu a été chargé depuis le fichier `{filename}` !")
-        except:  # noqa
+        except Exception as e:  # noqa
+            logger.error(f"Error when manually saving state: {e}")
             return
 
     @commands.command(name="sequence")
@@ -169,8 +176,8 @@ class Emulator(BaseCog):
             try:
                 message = await self.channel.fetch_message(self.messages.pop(0))
                 await message.delete()
-            except:  # noqa
-                pass
+            except Exception as e:  # noqa
+                logger.error(f"Error when deleting the oldest message: {e}")
         if self.screenshots:
             screenshot = next(iter(self.screenshots[::-1]))
             screenshot.save(
@@ -182,18 +189,19 @@ class Emulator(BaseCog):
             )
             try:
                 subprocess.run(["gifsicle", "-O3", "--lossy=80", f"{GAME_NAME}.gif", "-o", f"{GAME_NAME}.gif"])
-            except:  # noqa
-                pass
+            except Exception as e:  # noqa
+                logger.error(f"Error when resizing GIF with external program: {e}")
         try:
             self.message = await self.channel.send(file=discord.File(f"{GAME_NAME}.gif"))
             for icon in self.KEY_ICONS:
                 await self.message.add_reaction(icon)
-        except:  # noqa
-            return
-        self.messages.append(self.message.id)
+            self.messages.append(self.message.id)
+        except Exception as e:  # noqa
+            logger.error(f"Error when sending the new message: {e}")
         self.do_save()
 
-    def do_press(self, key: str, count: int = 0):
+    def do_press(self, key: str, count: int = 1):
+        logger.debug(f"Requested keys: {key} (x{count})")
         key_pressed, key_released, frames = self.KEYS.get(key.lower(), (None, None, None))
         for i in range(count):
             for _ in range(frames):
@@ -209,7 +217,7 @@ class Emulator(BaseCog):
                 for _ in range(GAME_TICKS):
                     self.game.tick()
                     self.do_screenshot()
-        return self.screenshots
+        logger.debug(f"Screenshots: {len(self.screenshots)}")
 
     def do_load(self):
         if os.path.exists(f"{GAME_NAME}.state"):
