@@ -188,7 +188,7 @@ class Emulator(BaseCog):
                 loop=0,
             )
             try:
-                subprocess.run(["gifsicle", "-O3", "--lossy=80", f"{GAME_NAME}.gif", "-o", f"{GAME_NAME}.gif"])
+                subprocess.run(["gifsicle", "-O3", "--lossy=80", "--colors=256", f"{GAME_NAME}.gif", "-o", f"{GAME_NAME}.gif"])
             except Exception as e:  # noqa
                 logger.error(f"Error when resizing GIF with external program: {e}")
         try:
