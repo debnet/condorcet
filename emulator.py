@@ -20,7 +20,7 @@ GAME_TICKS = int(os.environ.get("GAME_TICKS") or 60)
 GAME_SPEED = int(os.environ.get("GAME_SPEED") or 120)
 GAME_MAX_HISTORY = int(os.environ.get("GAME_MAX_HISTORY") or 10)
 GAME_DELAY = int(os.environ.get("GAME_DELAY") or 10)
-GAME_USE_CLOCK = int(os.environ.get("GAME_USE_CLOCK") or 0)
+GAME_USE_CLOCK = int(os.environ.get("GAME_USE_CLOCK") or True)
 
 regex_time = re.compile(r"((?P<day>[1-7])\s)?(?P<hours>[1-2]?\d)[:\s](?P<minutes>[0-5]\d)")
 
