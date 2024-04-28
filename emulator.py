@@ -178,7 +178,6 @@ class Emulator(BaseCog):
                 format="GIF",
                 save_all=True,
                 append_images=self.screenshots,
-                duration=16,
                 loop=0,
             )
             try:
