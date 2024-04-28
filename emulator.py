@@ -151,7 +151,8 @@ class Emulator(BaseCog):
             return
         self.screenshots = []
         for key in keys.split():
-            self.do_press(key)
+            if key.lower() in self.KEYS:
+                self.do_press(key)
         await self.next()
 
     async def next(self):
