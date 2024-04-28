@@ -20,7 +20,7 @@ GAME_TICKS = int(os.environ.get("GAME_TICKS") or 60)
 GAME_SPEED = int(os.environ.get("GAME_SPEED") or 120)
 GAME_MAX_HISTORY = int(os.environ.get("GAME_MAX_HISTORY") or 10)
 GAME_DELAY = int(os.environ.get("GAME_DELAY") or 10)
-GAME_USE_CLOCK = int(os.environ.get("GAME_USE_CLOCK") or True)
+GAME_USE_CLOCK = int(os.environ.get("GAME_USE_CLOCK") or 0)
 
 regex_time = re.compile(r"((?P<day>[1-7])\s)?(?P<hours>[1-2]?\d)[:\s](?P<minutes>[0-5]\d)")
 
@@ -241,7 +241,7 @@ class Emulator(BaseCog):
 
     @tasks.loop(seconds=3)
     async def cron(self):
-        if GAME_USE_CLOCK and self.game and not self.current_time:
+        if GAME_USE_CLOCK and self.game and self.current_time:
             now = datetime.now()
             self.game.memory[0xD4B6] = now.isoweekday()
             self.game.memory[0xD4B7] = now.hour
