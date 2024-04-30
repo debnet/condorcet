@@ -93,7 +93,7 @@ class Emulator(BaseCog):
         """
         if context and context.channel and hasattr(context.channel, "name"):
             await context.message.delete()
-        if GAME_USE_CLOCK:
+        if not GAME_USE_CLOCK:
             await context.author.send(":no_entry:  Ce jeu n'utilise pas d'horloge interne !")
             return
         if match := regex_time.match(time):
