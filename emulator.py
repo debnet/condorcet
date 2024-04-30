@@ -199,6 +199,7 @@ class Emulator(BaseCog):
             self.messages.append(self.message.id)
         except Exception as e:  # noqa
             logger.error(f"Error when sending the new message: {e}")
+            self.messages.clear()
         self.do_save()
 
     def do_press(self, key: str, count: int = 1):
