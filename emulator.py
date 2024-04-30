@@ -184,7 +184,8 @@ class Emulator(BaseCog):
                 f"{GAME_NAME}.gif",
                 format="GIF",
                 save_all=True,
-                append_images=self.screenshots,
+                append_images=self.screenshots[::4],
+                duration=16,
                 loop=0,
             )
             try:
