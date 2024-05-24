@@ -219,10 +219,6 @@ class Emulator(BaseCog):
                 for _ in range(GAME_TICKS):
                     self.game.tick()
                     self.do_screenshot()
-        logger.debug(f"Screenshots: {len(self.screenshots)}")
-        if GAME_USE_CLOCK and self.game:
-            day, hour, minute = self.game.memory[0xD4B6], self.game.memory[0xD4B7], self.game.memory[0xD4B8]
-            logger.debug(f"Game time: {day}-{hour}:{minute}")
 
     def do_load(self):
         if os.path.exists(f"{GAME_NAME}.state"):
