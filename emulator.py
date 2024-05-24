@@ -155,6 +155,21 @@ class Emulator(BaseCog):
             logger.error(f"Error when manually saving state: {e}")
             return
 
+    @commands.command(name="mem")
+    @commands.has_role(DISCORD_ADMIN)
+    async def _mem(self, context=None, *, address: str, value: int = None):
+        """
+        Permet de modifier la mémoire pendant l'exécution
+        """
+        if context and context.channel and hasattr(context.channel, "name"):
+            await context.message.delete()
+        if not self.game:
+            return
+        address = int(address, 16)
+        if value:
+            self.game.memory[address] = value
+        await context.author.send(f"Memory value at 0x{address.upper()}: {self.game.memory[address]}")
+
     @commands.command(name="sequence")
     @commands.has_role(DISCORD_ADMIN)
     async def _sequence(self, context=None, *, keys: str):
