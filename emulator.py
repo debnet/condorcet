@@ -103,7 +103,7 @@ class Emulator(BaseCog):
             self.game.memory[0xD4B8] = int(minutes)
             label = f"{hours}:{minutes}"
             if day := match.group("day"):
-                self.game.memory[0xD4B6] = self.game.memory[0xD4CB] = int(day)
+                self.game.memory[0xD4B6] = int(day)
                 days = {
                     "1": "lundi",
                     "2": "mardi",
@@ -220,6 +220,9 @@ class Emulator(BaseCog):
                     self.game.tick()
                     self.do_screenshot()
         logger.debug(f"Screenshots: {len(self.screenshots)}")
+        if GAME_USE_CLOCK and self.game:
+            day, hour, minute = self.game.memory[0xD4B6], self.game.memory[0xD4B7], self.game.memory[0xD4B8]
+            logger.debug(f"Game time: {day}-{hour}:{minute}")
 
     def do_load(self):
         if os.path.exists(f"{GAME_NAME}.state"):
@@ -245,7 +248,7 @@ class Emulator(BaseCog):
     async def cron(self):
         if GAME_USE_CLOCK and self.game and self.current_time:
             now = datetime.now()
-            self.game.memory[0xD4B6] = self.game.memory[0xD4CB] = now.isoweekday()
+            self.game.memory[0xD4B6] = now.isoweekday()
             self.game.memory[0xD4B7] = now.hour
             self.game.memory[0xD4B8] = now.minute
         if not self.message:
