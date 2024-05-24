@@ -166,7 +166,7 @@ class Emulator(BaseCog):
         if not self.game:
             return
         address = int(address, 16)
-        if value:
+        if value is not None:
             self.game.memory[address] = value
         await context.author.send(f"Memory value at {hex(address).upper()}: {self.game.memory[address]}")
 
