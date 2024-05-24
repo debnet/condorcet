@@ -168,7 +168,7 @@ class Emulator(BaseCog):
         address = int(address, 16)
         if value:
             self.game.memory[address] = value
-        await context.author.send(f"Memory value at 0x{address.upper()}: {self.game.memory[address]}")
+        await context.author.send(f"Memory value at {hex(address).upper()}: {self.game.memory[address]}")
 
     @commands.command(name="sequence")
     @commands.has_role(DISCORD_ADMIN)
