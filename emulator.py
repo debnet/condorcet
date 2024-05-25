@@ -169,6 +169,7 @@ class Emulator(BaseCog):
         address = int(address, 16)
         if value is not None:
             self.game.memory[address] = int(value)
+            logger.debug(f"Memory edited at {hex(address)} with {int(value)}, value is now {self.game.memory[address]}")
         await context.author.send(f"Memory value at **{hex(address)}** = **{self.game.memory[address]}**")
 
     @commands.command(name="sequence")
