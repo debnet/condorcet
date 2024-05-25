@@ -157,7 +157,7 @@ class Emulator(BaseCog):
 
     @commands.command(name="mem")
     @commands.has_role(DISCORD_ADMIN)
-    async def _mem(self, context=None, *, address: str, value: int = None):
+    async def _mem(self, context=None, *, value: str):
         """
         Permet de modifier la mémoire pendant l'exécution
         """
@@ -165,9 +165,10 @@ class Emulator(BaseCog):
             await context.message.delete()
         if not self.game:
             return
+        address, value = (value.split() + [None])[:2]
         address = int(address, 16)
         if value is not None:
-            self.game.memory[address] = value
+            self.game.memory[address] = int(value)
         await context.author.send(f"Memory value at {hex(address).upper()}: {self.game.memory[address]}")
 
     @commands.command(name="sequence")
