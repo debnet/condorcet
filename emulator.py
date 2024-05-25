@@ -151,6 +151,7 @@ class Emulator(BaseCog):
             with open(f"saves/{filename}.state", "rb") as file:
                 self.game.load_state(file)
             await self.channel.send(f":floppy_disk:  L'état du jeu a été chargé depuis le fichier `{filename}` !")
+            await self.next()
         except Exception as e:  # noqa
             logger.error(f"Error when manually saving state: {e}")
             return
