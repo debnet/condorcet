@@ -51,6 +51,7 @@ class Emulator(BaseCog):
         "start": (WindowEvent.PRESS_BUTTON_START, WindowEvent.RELEASE_BUTTON_START, 10),
         "select": (WindowEvent.PRESS_BUTTON_SELECT, WindowEvent.RELEASE_BUTTON_SELECT, 10),
         "speed": (None, None, GAME_SPEED),
+        "none": (None, None, 10),
     }
 
     def __init__(self, *args, **kwargs):
@@ -151,7 +152,7 @@ class Emulator(BaseCog):
             with open(f"saves/{filename}.state", "rb") as file:
                 self.game.load_state(file)
             await self.channel.send(f":floppy_disk:  L'état du jeu a été chargé depuis le fichier `{filename}` !")
-            self.game.tick()
+            self.do_press("none")
             await self.next()
         except Exception as e:  # noqa
             logger.error(f"Error when manually saving state: {e}")
@@ -171,7 +172,6 @@ class Emulator(BaseCog):
         address = int(address, 16)
         if value is not None:
             self.game.memory[address] = int(value)
-            self.game.tick(render=False)
             logger.debug(f"Memory edited at {hex(address)} with {int(value)}, value is now {self.game.memory[address]}")
         await context.author.send(f"Memory value at **{hex(address)}** = **{self.game.memory[address]}**")
 
