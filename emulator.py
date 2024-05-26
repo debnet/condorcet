@@ -57,6 +57,27 @@ class Emulator(BaseCog):
         super().__init__(*args, **kwargs)
         self.game = PyBoy(GAME_NAME, window="null", cgb=True)
         self.game.set_emulation_speed(0)
+        if GAME_USE_CLOCK:
+            # Enable external RAM
+            self.game.memory[0x0000] = 0x0A
+            # Reset seconds
+            self.game.memory[0x4000] = 0x08
+            self.game.memory[0xA000] = 0
+            # Reset minutes
+            self.game.memory[0x4000] = 0x09
+            self.game.memory[0xA000] = 0
+            # Reset hours
+            self.game.memory[0x4000] = 0x0a
+            self.game.memory[0xA000] = 0
+            # Reset days (low)
+            self.game.memory[0x4000] = 0x0b
+            self.game.memory[0xA000] = 0
+            # Reset days (high)
+            self.game.memory[0x4000] = 0x0c
+            self.game.memory[0xA000] = 0
+            # Latch clock
+            self.game.memory[0x6000] = 0
+            self.game.memory[0x6000] = 1
         self.channel = None
         self.message = None
         self.messages = []
