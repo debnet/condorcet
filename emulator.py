@@ -291,7 +291,11 @@ class Emulator(BaseCog):
                 self.game.memory[0xD4B8] = now.minute
         if not self.message:
             return
-        self.message = await self.channel.fetch_message(self.message.id)
+        try:
+            self.message = await self.channel.fetch_message(self.message.id)
+        except Exception as e:
+            logger.error(f"Error when fetching last message: {e}")
+            return
         if len(self.message.reactions) < len(self.KEY_ICONS):
             return
         counts = Counter()
