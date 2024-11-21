@@ -169,7 +169,7 @@ class Geoguessr(BaseCog):
                 self.last_message = await channel.send(
                     ":trophy:  Voici le classement des participants du jour:\n" + "\n".join(messages)
                 )
-                await self.last_message.pin(reason="Classement des participants")
+                # await self.last_message.pin(reason="Classement des participants")
         coords = self.create()
         Place.create(
             city=coords.city,
@@ -190,7 +190,7 @@ class Geoguessr(BaseCog):
                 discord.File(f"images/W.jpg"),
             ),
         )
-        await self.last_message.pin(reason=f"Geoguessr du {today:%A %d %B %Y}")
+        # await self.last_message.pin(reason=f"Geoguessr du {today:%A %d %B %Y}")
 
     @commands.command(name="clue")
     @commands.has_role(DISCORD_ADMIN)
