@@ -6,5 +6,5 @@ python-dateutil<2.9.0
 python3-vote-core==20170329.0
 py-cord==2.5.0
 pyboy==2.0.3
-requests==2.31.0
+requests==2.32.0
 shapely==2.0.4
